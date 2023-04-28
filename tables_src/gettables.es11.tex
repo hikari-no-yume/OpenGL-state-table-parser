@@ -1,0 +1,795 @@
+% Copyright 2002-2008 The Khronos Group Inc.
+% Copyright 1992-2002 Silicon Graphics, Inc.
+% SPDX-License-Identifier: CC-BY-4.0
+
+% State tables
+
+% Try to make footers not run into long table titles
+\addtolength{\footskip}{0.6in}
+
+%variable-name  type  default  get-routine  get-name  brief-desc  see-section
+%                                   attribute-class
+\small
+
+% Define required minimum number of texture units (2, was 1) for state tables
+\def\mtexnum{2*}
+
+% Useful macro
+\def\bgl#1{{\bf Begin/End #1}}
+
+% \doentry defines one row of a GL state table
+% \cbentry is like \doentry, but places a change symbol in the row
+%   (since change bars don't work properly on these landscape-format tables).
+%   It also changes the caption to include a change bar.
+% \grayentry and \graycbentry are like \doentry and \cbentry,
+%   respectively, but put the entry over a gray background (actually,
+%   \graycbentry doesn't put in the change symbol, for now). The gray
+%   level is defined to be 80%, as for body text put in a colorbox
+%   (see glspec.tex for color definitions).
+    \def\foof{-}
+    \def\dochange{1}
+    % fmtentry
+    %   #1 -> indicate changed entry, if 1
+    %   #2 -> ignored
+    %   #3 -> Type                          #2
+    %   #4 -> Initial/Minimum Value         #3
+    %   #5 -> Get Command                   #4
+    %   #6 -> Get Value                     #5
+    %   #7 -> Description                   #6
+    %   #8 -> Section reference             #7
+    %   #9 -> Attribute Group               #8
+    %% I've attempted to do this with \newcommand and failed utterly.
+    \def\fmtentry#1#2#3#4#5#6#7#8#9{\hline
+        \ifnum\dochange=#1\color{magenta}\fi
+        #2 \def\foo{#6}
+        \if \foo \foof {\tiny --} \else {\raggedright \tiny #6}\wrcon{#6} \fi &
+        $#3$ & {\bf #5} & #4 &
+        \raggedright {#7} & \ref{#8} & #9\\}
+    \def\doentry#1#2#3#4#5#6#7#8{\fmtentry{0}{}{#2}{#3}{#4}{#5}{#6}{#7}{#8}}
+    \def\cbentry#1#2#3#4#5#6#7#8{\fmtentry{1}{}{#2}{#3}{#4}{#5}{#6}{#7}{#8}}
+
+% A deleted table entry
+\def\delentry#1#2#3#4#5#6#7#8{}
+
+% tabheader starts a state table
+% arguments are
+%   \tabheader{fieldformat}{nameOfValueField}
+\newcommand{\tabheader}[2]{\hsize=800pt
+\begin{tabular}{#1}
+\multicolumn{1}{c}{Get value} &
+\multicolumn{1}{c}{Type} &
+\multicolumn{1}{c}{\vbox{\hbox{Get}\vskip 2pt\hbox{Cmnd}}} &
+\multicolumn{1}{c}{\vbox{\hbox{#2}\vskip 2pt\hbox{Value}}} &
+\multicolumn{1}{c}{Description} &
+\multicolumn{1}{c}{Sec.} &
+\multicolumn{1}{c}{Attribute} \\
+}
+
+% Start a state table
+%   \newstart               - default format
+%   \newshortcommentstart   - narrower comment column
+%   \newshortcommandstart   - narrower GL command column
+%   \newfixstart            - fixed width enumerant (state name) column
+%   \newlimitstart          - for state with minimum, rather than initial, values
+%   \newshortlimitstart     - with narrower get value and GL command columns
+\def\newstart{\tabheader{|l||c|c|c|p{2in}|c|c|}{Initial}}
+\def\newshortcommentstart{\tabheader{|l||c|c|c|p{1.0in}|c|c|}{Initial}}
+\def\newshortcommandstart{\tabheader{|l||c|p{1.1in}|c|p{1.4in}|c|c|}{Initial}}
+\def\newfixstart{\tabheader{|p{1.6in}||c|c|c|p{1.4in}|c|c|}{Initial}}
+\def\newlimitstart{\tabheader{|l||c|c|c|p{2in}|c|c|}{Minimum}}
+\def\newshortlimitstart{\tabheader{|p{2in}||c|p{1.1in}|c|p{1.4in}|c|c|}{Minimum}}
+
+% \begin{statetable}[cbflag]{title}{label}
+%   cbflag should be '1' if changebars on the caption are desired
+%   title is the table caption; label is the TeX reference.
+%   \dobar is defined to '1' so it can be used for a visual cue -
+%       write \begin{statetable}[\dobar].
+\def\dobar{1}
+\newenvironment{statetable}[3][0]{
+    \enlargethispage*{2in}  % Fit table + caption down to \pagebreak below
+    % Save parameters for the caption/table index
+    \def\sttitle{#2}
+    \def\stlabel{#3}
+    % Define version of the table caption with changebars, if appropriate
+    \def\stcbtitle{#2}
+    % Start the table, centered, oriented sideways
+    \begin{center}
+    \begin{sideways}
+}{
+    % End the sideways table
+    \end{sideways}
+    % Caption and table index
+    \vskip \baselineskip
+    \refstepcounter{table}{\large Table \thetable . \stcbtitle}
+    \label{\stlabel}   % must follow \refstepcounter before \addcontentsline
+    \addcontentsline{lot}{table}{\protect\numberline{\thetable}{\sttitle}}
+    % Center both table and caption
+    \end{center}
+    \pagebreak          % Fit table + caption from \enlargethispage* above
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{statetable}{GL Internal primitive assembly state variables (inaccessible)}{statetab:internal}
+\newstart
+\doentry{line-vertex}{V}{--}{--}{-}{Previous vertex in a line segment}{bgn:end}{--}
+\doentry{line-first}{B}{--}{--}{-}
+    {Indicates if {\em line-vertex} is the first}{bgn:end}{--}
+\doentry{line-loop-vertex}{V}{--}{--}{-}
+    {First vertex of a line loop}{bgn:end}{--}
+\doentry{tstrip-vertices}{2 \times V}{--}{--}{-}
+    {Previous two vertices in a triangle strip}{bgn:end}{--}
+\doentry{tstrip-vertex-pos}{Z_3}{--}{--}{-}
+    {Number of vertices so far in triangle strip: 0, 1, or more}{bgn:end}{--}
+\doentry{tstrip-vertex-ptr}{Z_2}{--}{--}{-}
+    {Triangle strip A/B vertex pointer}{bgn:end}{--}
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}[\dobar]{Current Values and Associated Data}{statetab:current}    % 6.5
+\newstart
+\doentry{current-color}{C}{1,1,1,1}{\vbox{\hbox{{\bf GetIntegerv},}\hbox{\bf GetFloatv}}}
+    {CURRENT\_COLOR}{Current color}{vert:spec}{current}
+\doentry{current-texture-coord}{\mtexnum \times T}{0,0,0,1}{GetFloatv}                % ARB_multitexture
+    {CURRENT\_TEXTURE\_COORDS}
+    {Current texture coordinates}{vert:spec}{current}
+\doentry{current-normal}{N}{0,0,1}{GetFloatv}{CURRENT\_NORMAL}
+    {Current normal}{vert:spec}{current}
+\doentry{assoc-color}{C}{-}{--}
+    {-}{Color associated with last vertex}{bgn:end:p}{--}
+\doentry{assoc-texture-coord}{T}{-}{--}
+    {-}{Texture coordinates associated with last vertex}{bgn:end:p}{--}
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}[\dobar]{Vertex Array Data}{statetab:vertexarray}                 % 6.6
+\newstart
+\doentry{current-active-client-texture}{Z_{\mtexnum}}{\glc{TEXTURE0}}            % ARB_multitexture (new)
+    {GetIntegerv}{CLIENT\_ACTIVE\_TEXTURE}
+    {Client active texture unit selector}{vert:spec}{vertex-array}
+
+\doentry{vertex-array}{B}{\em False}{IsEnabled}
+    {VERTEX\_ARRAY}{Vertex array enable}{vert:array}{vertex-array}
+\doentry{vertex-array-size}{Z^{+}}{4}{GetIntegerv}
+    {VERTEX\_ARRAY\_SIZE}{Coordinates per vertex}{vert:array}{vertex-array}
+\doentry{vertex-array-type}{Z_4}{\glc{FLOAT}}{GetIntegerv}
+    {VERTEX\_ARRAY\_TYPE}{Type of vertex coordinates}{vert:array}{vertex-array}
+\doentry{vertex-array-stride}{Z^{+}}{0}{GetIntegerv}
+    {VERTEX\_ARRAY\_STRIDE}{Stride between vertices}{vert:array}{vertex-array}
+\doentry{vertex-array-pointer}{Y}{0}{GetPointerv}
+    {VERTEX\_ARRAY\_POINTER}{Pointer to the vertex array}{vert:array}{vertex-array}
+
+\doentry{normal-array}{B}{\em False}{IsEnabled}
+    {NORMAL\_ARRAY}{Normal array enable}{vert:array}{vertex-array}
+\doentry{normal-array-type}{Z_5}{\glc{FLOAT}}{GetIntegerv}
+    {NORMAL\_ARRAY\_TYPE}{Type of normal coordinates}{vert:array}{vertex-array}
+\doentry{normal-array-stride}{Z^{+}}{0}{GetIntegerv}
+    {NORMAL\_ARRAY\_STRIDE}{Stride between normals}{vert:array}{vertex-array}
+\doentry{normal-array-pointer}{Y}{0}{GetPointerv}
+    {NORMAL\_ARRAY\_POINTER}{Pointer to the normal array}{vert:array}{vertex-array}
+
+\doentry{color-array}{B}{\em False}{IsEnabled}
+    {COLOR\_ARRAY}{Color array enable}{vert:array}{vertex-array}
+\doentry{color-array-size}{Z^{+}}{4}{GetIntegerv}
+    {COLOR\_ARRAY\_SIZE}{Color components per vertex}{vert:array}{vertex-array}
+\doentry{color-array-type}{Z_8}{\glc{FLOAT}}{GetIntegerv}
+    {COLOR\_ARRAY\_TYPE}{Type of color components}{vert:array}{vertex-array}
+\doentry{color-array-stride}{Z^{+}}{0}{GetIntegerv}
+    {COLOR\_ARRAY\_STRIDE}{Stride between colors}{vert:array}{vertex-array}
+\doentry{color-array-pointer}{Y}{0}{GetPointerv}
+    {COLOR\_ARRAY\_POINTER}{Pointer to the color array}{vert:array}{vertex-array}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Vertex Array Data (cont.)}{statetab:vertexarray2}                % 6.7
+\newstart
+% ARB_multitexture
+\doentry{texcoord-array}{\mtexnum \times B}{\em False}{IsEnabled}
+    {TEXTURE\_COORD\_ARRAY}{Texture coordinate array enable}
+    {vert:array}{vertex-array}
+\doentry{texcoord-array-size}{\mtexnum \times Z^{+}}{4}{GetIntegerv}
+    {TEXTURE\_COORD\_ARRAY\_SIZE}{Coordinates per element}
+    {vert:array}{vertex-array}
+\doentry{texcoord-array-type}{\mtexnum \times Z_4}{\glc{FLOAT}}{GetIntegerv}
+    {TEXTURE\_COORD\_ARRAY\_TYPE}{Type of texture coordinates}
+    {vert:array}{vertex-array}
+\doentry{texcoord-array-stride}{\mtexnum \times Z^{+}}{0}{GetIntegerv}
+    {TEXTURE\_COORD\_ARRAY\_STRIDE}{Stride between texture coordinates}
+    {vert:array}{vertex-array}
+\doentry{texcoord-array-pointer}{\mtexnum \times Y}{0}{GetPointerv}
+    {TEXTURE\_COORD\_ARRAY\_POINTER}{Pointer to the texture coordinate array}
+    {vert:array}{vertex-array}
+% End ARB_multitexture
+
+% OES_point_size_array
+\doentry{point-size-array}{B}{\em False}{IsEnabled}
+    {POINT\_SIZE\_ARRAY\_OES}{Point size array enable}
+    {vert:array}{vertex-array}
+\doentry{point-size-array-type}{Z_2}{\glc{FLOAT}}{GetIntegerv}
+    {POINT\_SIZE\_ARRAY\_TYPE\_OES}{Type of point sizes}
+    {vert:array}{vertex-array}
+\doentry{point-size-array-stride}{Z^{+}}{0}{GetIntegerv}
+    {POINT\_SIZE\_ARRAY\_STRIDE\_OES}{Stride between point sizes}
+    {vert:array}{vertex-array}
+\doentry{point-size-array-pointer}{Y}{0}{GetPointerv}
+    {POINT\_SIZE\_ARRAY\_POINTER\_OES}{Pointer to the point size array}
+    {vert:array}{vertex-array}
+% End OES_point_size_array
+
+% ARB_vertex_buffer_object
+\doentry{bufobj-binding}{Z^{+}}{0}{GetIntegerv}{ARRAY\_BUFFER\_BINDING}{current buffer binding}{vert:vbo}{vertex-array}
+\doentry{vert-bufobj-binding}{Z^{+}}{0}{GetIntegerv}{VERTEX\_ARRAY\_BUFFER\_BINDING}{vertex array buffer binding}{vert:vbo}{vertex-array}
+\doentry{norm-bufobj-binding}{Z^{+}}{0}{GetIntegerv}{NORMAL\_ARRAY\_BUFFER\_BINDING}{normal array buffer binding}{vert:vbo}{vertex-array}
+\doentry{color-bufobj-binding}{Z^{+}}{0}{GetIntegerv}{COLOR\_ARRAY\_BUFFER\_BINDING}{color array buffer binding}{vert:vbo}{vertex-array}
+\doentry{tex-bufobj-binding}{\mtexnum \times Z^{+}}{0}{GetIntegerv}{TEXTURE\_COORD\_ARRAY\_BUFFER\_BINDING}{texcoord array buffer binding}{vert:vbo}{vertex-array}
+% OES_point_size_array
+\doentry{point-size-bufobj-binding}{Z^{+}}{0}{GetIntegerv}{POINT\_SIZE\_ARRAY\_BUFFER\_BINDING\_OES}{point size array buffer binding}{vert:vbo}{vertex-array}
+% End OES_point_size_array
+%% \doentry{weightarray-bufobj-binding}{Z^{+}}{0}{GetIntegerv}{WEIGHT\_ARRAY\_BUFFER\_BINDING}{weight array buffer binding}{vert:vbo}{vertex-array}
+\doentry{elemarray-bufobj-binding}{Z^{+}}{0}{GetIntegerv}{ELEMENT\_ARRAY\_BUFFER\_BINDING}{element array buffer binding}{vert:vbo:indices}{vertex-array}
+%% \doentry{attribarray-bufobj-binding}{16+ x Z^{+}}{0}{GetVertexAttribivARB}{VERTEX\_ATTRIB\_ARRAY\_BUFFER\_BINDING}{attribute array buffer binding}{vert:vbo}{vertex-array}
+% End ARB_vertex_buffer_object
+
+\hline
+\end{tabular}
+\end{statetable}
+
+% ARB_vertex_buffer_object
+\begin{statetable}{Buffer Object State}{statetab:vbostate}                          % 6.8
+\newstart
+\cbentry{bufobj-data}{n \times BMU}{-}{--}{}{buffer data}{vert:vbo}{-}
+\doentry{bufobj-bufsize}{n \times Z^{+}}{0}{GetBufferParameteriv}{BUFFER\_SIZE}{buffer data size}{vert:vbo}{-}
+\doentry{bufobj-usage}{n \times Z^9}{STATIC\_DRAW}{GetBufferParameteriv}{BUFFER\_USAGE}{buffer usage pattern}{vert:vbo}{-}
+% OES - MapBuffer/UnmapBuffer removed
+%% \doentry{bufobj-access}{n \times Z^3}{WRITE\_ONLY}{GetBufferParameteriv}{BUFFER\_ACCESS}{buffer access flag}{vert:vbo}{-}
+%% \doentry{bufobj-mapflag}{n \times B}{FALSE}{GetBufferParameteriv}{BUFFER\_MAPPED}{buffer map flag}{vert:vbo}{-}
+\hline
+\end{tabular}
+\end{statetable}
+% End ARB_vertex_buffer_object
+
+
+\begin{statetable}{Transformation state}{statetab:transform}                        % 6.9
+\newfixstart
+\doentry{model-view-xf-stack}{16* \times M^{4}}{Identity}{GetFloatv}
+    {MODELVIEW\_MATRIX}
+    {Model-view matrix stack}{matrices}{--}
+\doentry{projection-xf-stack}{2* \times M^{4}}{Identity}{GetFloatv}
+    {PROJECTION\_MATRIX}
+    {Projection matrix stack}{matrices}{--}
+\doentry{texture-xf-stack}{\mtexnum \times 2* \times M^{4}}{Identity}{GetFloatv}      % ARB_multitexture
+    {TEXTURE\_MATRIX}
+    {Texture matrix stack}{matrices}{--}
+
+% OES_matrix_get
+\doentry{model-view-xf-intbits}{4 \times 4 \times Z}{Identity}{GetIntegerv}
+    {MODELVIEW\_MATRIX\_FLOAT\_AS\_INT\_BITS\_OES}
+    {Alias of \glc{MODELVIEW\_MATRIX} in integer encoding}{matrices}{--}
+\doentry{projection-xf-intbits}{4 \times 4 \times Z}{Identity}{GetIntegerv}
+    {PROJECTION\_MATRIX\_FLOAT\_AS\_INT\_BITS\_OES}
+    {Alias of \glc{PROJECTION\_MATRIX} in integer encoding}{matrices}{--}
+\doentry{texture-xf-intbits}{4 \times 4 \times Z}{Identity}{GetIntegerv}
+    {TEXTURE\_MATRIX\_FLOAT\_AS\_INT\_BITS\_OES}
+    {Alias of \glc{TEXTURE\_MATRIX} in integer encoding}{matrices}{--}
+
+\doentry{viewport}{4 \times Z}{see~\ref{view:port}}{GetIntegerv}{VIEWPORT}
+    {Viewport origin \& extent}{view:port}{viewport}
+\doentry{depthrange}{2 \times R^{+}}{0,1}{GetFloatv}{DEPTH\_RANGE}
+    {Depth range near \& far}{view:port}{viewport}
+\doentry{model-view-sp}{Z^{+}}{1}{GetIntegerv}{MODELVIEW\_STACK\_DEPTH}
+    {Model-view matrix stack pointer}{matrices}{--}
+\doentry{projection-sp}{Z^{+}}{1}{GetIntegerv}{PROJECTION\_STACK\_DEPTH}
+    {Projection matrix stack pointer}{matrices}{--}
+\doentry{texture-sp}{\mtexnum \times Z^{+}}{1}{GetIntegerv}{TEXTURE\_STACK\_DEPTH}    % ARB_multitexture
+    {Texture matrix stack pointer}{matrices}{--}
+\doentry{matrix-mode}{Z_4}{\tt MODELVIEW}{GetIntegerv}
+    {MATRIX\_MODE}{Current matrix mode}{matrices}{transform}
+\doentry{normalize}{B}{\em False}{IsEnabled}
+    {NORMALIZE}{Current normal normalization on/off}{normal:xf}{transform/enable}
+\doentry{rescale-normal}{B}{\em False}{IsEnabled}
+    {RESCALE\_NORMAL}{Current normal rescaling on/off}{normal:xf}{transform/enable}
+\doentry{user-clip-planes}{1* \times R^4}{0,0,0,0}{GetClipPlane}{CLIP\_PLANE$i$}
+    {User clipping plane coefficients}{clipping}{transform}
+\doentry{user-clip-enables}{1* \times B}{\em False}{IsEnabled}{CLIP\_PLANE$i$}
+    {$i$th user clipping plane enabled}{clipping}{transform/enable}
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}[\dobar]{Coloring}{statetab:coloring}                             % 6.10
+\newstart
+\doentry{fog-color}{C}{0,0,0,0}{GetFloatv}{FOG\_COLOR}
+    {Fog color}{fog}{fog}
+\doentry{fog-density}{R}{1.0}{GetFloatv}{FOG\_DENSITY}
+    {Exponential fog density}{fog}{fog}
+\doentry{fog-start}{R}{0.0}{GetFloatv}{FOG\_START}
+    {Linear fog start}{fog}{fog}
+\doentry{fog-end}{R}{1.0}{GetFloatv}{FOG\_END}
+    {Linear fog end}{fog}{fog}
+\doentry{fog-mode}{Z_3}{\glc{EXP}}{GetIntegerv}{FOG\_MODE}
+    {Fog mode}{fog}{fog}
+\doentry{fog-enable}{B}{\em False}{IsEnabled}{FOG}
+    {True if fog enabled}{fog}{fog/enable}
+\doentry{shade-model}{Z^{+}}{\glc{SMOOTH}}{GetIntegerv}{SHADE\_MODEL}
+    {{\bf ShadeModel} setting}{flat:shading}{lighting}
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}{Lighting (see also Table~\ref{light:tab1} for defaults)}         % 6.11
+    {statetab:lighting}
+\newshortcommentstart
+\doentry{lighting-on}{B}{\em False}{IsEnabled}{LIGHTING}
+    {True if lighting is enabled}{lighting}{lighting/enable}
+\doentry{color-material}{B}{\em False}{IsEnabled}{COLOR\_MATERIAL}
+    {True if color tracking is enabled}{colormode}{lighting/enable}
+\doentry{${\bf a}_{cm}$}{2 \times C}{(0.2,0.2,0.2,1.0)}{GetMaterialfv}{AMBIENT}
+    {Ambient material color}{lighting}{lighting}
+\doentry{${\bf d}_{cm}$}{2 \times C}{(0.8,0.8,0.8,1.0)}{GetMaterialfv}{DIFFUSE}
+    {Diffuse material color}{lighting}{lighting}
+\doentry{${\bf s}_{cm}$}{2 \times C}{(0.0,0.0,0.0,1.0)}{GetMaterialfv}{SPECULAR}
+    {Specular material color}{lighting}{lighting}
+\doentry{${\bf e}_{cm}$}{2 \times C}{(0.0,0.0,0.0,1.0)}{GetMaterialfv}{EMISSION}
+    {Emissive mat. color}{lighting}{lighting}
+\doentry{$s_{rm}$}{2 \times R}{0.0}{GetMaterialfv}{SHININESS}
+    {Specular exponent of material}{lighting}{lighting}
+\doentry{${\bf a}_{cs}$}{C}{(0.2,0.2,0.2,1.0)}{GetFloatv}{LIGHT\_MODEL\_AMBIENT}
+    {Ambient scene color}{lighting}{lighting}
+\doentry{$t_{bs}$}{B}{\em False}{GetBooleanv}{LIGHT\_MODEL\_TWO\_SIDE}
+    {Use two-sided lighting}{lighting}{lighting}
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}{Lighting (cont.)}{statetab:lighting1}                            % 6.12
+\newstart
+\doentry{${\bf a}_{cli}$}{8* \times C}{(0.0,0.0,0.0,1.0)}{GetLightfv}{AMBIENT}
+    {Ambient intensity of light $i$}{lighting}{lighting}
+\doentry{${\bf d}_{cli}$}{8* \times C}{see 2.5}{GetLightfv}{DIFFUSE}
+    {Diffuse intensity of light $i$}{lighting}{lighting}
+\doentry{${\bf s}_{cli}$}{8* \times C}{see 2.5}{GetLightfv}{SPECULAR}
+    {Specular intensity of light $i$}{lighting}{lighting}
+\doentry{${\bf P}_{pli}$}{8* \times P}{(0.0,0.0,1.0,0.0)}{GetLightfv}{POSITION}
+    {Position of light $i$}{lighting}{lighting}
+\doentry{$k_{0i}$}{8* \times R^{+}}{1.0}{GetLightfv}{CONSTANT\_ATTENUATION}
+    {Constant atten. factor}{lighting}{lighting}
+\doentry{$k_{1i}$}{8* \times R^{+}}{0.0}{GetLightfv}{LINEAR\_ATTENUATION}
+    {Linear atten. factor}{lighting}{lighting}
+\doentry{$k_{2i}$}{8* \times R^{+}}{0.0}{GetLightfv}{QUADRATIC\_ATTENUATION}
+    {Quadratic atten. factor}{lighting}{lighting}
+\doentry{${\bf s}_{dli}$}{8* \times D}{(0.0,0.0,-1.0)}{GetLightfv}{SPOT\_DIRECTION}
+    {Spotlight direction of light $i$}{lighting}{lighting}
+\doentry{$s_{rli}$}{8* \times R^{+}}{0.0}{GetLightfv}{SPOT\_EXPONENT}
+    {Spotlight exponent of light $i$}{lighting}{lighting}
+\doentry{$c_{rli}$}{8* \times R^{+}}{180.0}{GetLightfv}{SPOT\_CUTOFF}
+    {Spot. angle of light $i$}{lighting}{lighting}
+\doentry{light-$i$-enable}{8* \times B}{\em False}{IsEnabled}{LIGHT$i$}
+    {True if light $i$ enabled}{lighting}{lighting/enable}
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}[\dobar]{Rasterization}{statetab:raster}                          % 6.13
+\newstart
+\doentry{pnt-size}{R^{+}}{1.0}{GetFloatv}{POINT\_SIZE}
+    {Point size}{points}{point}
+\doentry{pnt-smooth}{B}{\em False}{IsEnabled}{POINT\_SMOOTH}
+    {Point antialiasing on}{points}{point/enable}
+% ARB_point_parameters
+\doentry{pnt-size-min}{R^{+}}{0.0}{GetFloatv}{POINT\_SIZE\_MIN}
+    {Attenuated minimum point size}{points}{point}
+\doentry{pnt-size-max}{R^{+}}{\footnotemark[1]}{GetFloatv}{POINT\_SIZE\_MAX}
+    {Attenuated maximum point size. \footnotemark[1] Max. of the impl.
+    dependent max. aliased and smooth point sizes.}{points}{point}
+\doentry{pnt-fade-size}{R^{+}}{1.0}{GetFloatv}{POINT\_FADE\_THRESHOLD\_SIZE}
+    {Threshold for alpha attenuation}{points}{point}
+\doentry{pnt-dist-atten}{3 \times R^{+}}{1,0,0}{GetFloatv}
+    {POINT\_DISTANCE\_ATTENUATION}{Attenuation coefficients}
+    {points}{point}
+% End ARB_point_parameters
+% OES_point_sprite
+\doentry{pnt-sprite-enable}{B}{\em False}{IsEnabled}{POINT\_SPRITE\_OES}
+    {Point sprites enabled}{points}{point}
+% End OES_point_sprite
+\doentry{line-width}{R^{+}}{1.0}{GetFloatv}{LINE\_WIDTH}
+    {Line width}{lines}{line}
+\doentry{line-smooth}{B}{\em False}{IsEnabled}{LINE\_SMOOTH}
+    {Line antialiasing on}{lines}{line/enable}
+\doentry{poly-cull-enable}{B}{\em False}{IsEnabled}{CULL\_FACE}
+    {Polygon culling enabled}{ppoly:ras}{polygon/enable}
+\doentry{poly-cull-face}{Z_3}{\glc{BACK}}{GetIntegerv}{CULL\_FACE\_MODE}
+    {Cull front/back facing polygons}{ppoly:ras}{polygon}
+\doentry{poly-front-face}{Z_2}{\glc{CCW}}{GetIntegerv}{FRONT\_FACE}
+    {Polygon frontface CW/CCW indicator}{ppoly:ras}{polygon}
+\doentry{poly-offset-factor}{R}{0}{GetFloatv}{POLYGON\_OFFSET\_FACTOR}
+    {Polygon offset factor}{polyoffset}{polygon}
+\doentry{poly-offset-units}{R}{0}{GetFloatv}{POLYGON\_OFFSET\_UNITS}
+    {Polygon offset units}{polyoffset}{polygon}
+\doentry{poly-offset-fill}{B}{\em False}{IsEnabled}{POLYGON\_OFFSET\_FILL}
+    {Polygon offset enable}{polyoffset}{polygon/enable}
+\hline
+\end{tabular}
+\end{statetable}
+
+% ARB_multisample
+\begin{statetable}{Multisampling}{statetab:multisample}                             % 6.14
+\newstart
+\doentry{ms-enable}{B}{\em True}{IsEnabled}{MULTISAMPLE}
+    {Multisample rasterization}{multisample}{multisample/enable}
+\doentry{ms-alpha-cov}{B}{\em False}{IsEnabled}{SAMPLE\_ALPHA\_TO\_COVERAGE}
+    {Modify coverage from alpha}{multisample:fragment}{multisample/enable}
+\doentry{ms-alpha-one}{B}{\em False}{IsEnabled}{SAMPLE\_ALPHA\_TO\_ONE}
+    {Set alpha to maximum}{multisample:fragment}{multisample/enable}
+\doentry{ms-coverage}{B}{\em False}{IsEnabled}{SAMPLE\_COVERAGE}
+    {Mask to modify coverage}{multisample:fragment}{multisample/enable}
+\doentry{ms-coverage-value}{R^{+}}{1}{GetFloatv}{SAMPLE\_COVERAGE\_VALUE}
+    {Coverage mask value}{multisample:fragment}{multisample}
+\doentry{ms-coverage-invert}{B}{\em False}{GetBooleanv}
+    {SAMPLE\_COVERAGE\_INVERT}{Invert coverage mask value}
+    {multisample:fragment}{multisample}
+\hline
+\end{tabular}
+\end{statetable}
+% End ARB_multisample
+
+\begin{statetable}{Textures (state per texture unit and binding point)}{statetab:texture}   % 6.15
+\newfixstart
+% state per binding point
+
+% ARB_multitexture
+\doentry{tex-enable-2d}{\mtexnum \times B}{\em False}{IsEnabled}
+    {TEXTURE\_2D}
+    {True if 2D texturing is enabled}
+    {tex:appl}{texture/enable}
+% End ARB_multitexture
+% ARB_multitexture
+\doentry{tex-binding-2d}{\mtexnum \times Z^+}{0}{GetIntegerv}
+    {TEXTURE\_BINDING\_2D}{Texture object bound to \glc{TEXTURE\_2D}}
+    {tex:object}{texture}
+% End ARB_multitexture
+
+% Image arrays
+\doentry{tex-image-2}{n \times I}{see \ref{texturing}}{--}
+    {TEXTURE\_2D}{2D texture image at l.o.d. $i$}{texturing}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}[\dobar]{Textures (state per texture object)}{statetab:texture2}  % 6.16
+\newfixstart
+
+% State per texture object
+\doentry{tex-minify}{n \times Z_6}{see \ref{texturing}}{GetTexParameter}
+    {TEXTURE\_MIN\_FILTER}{Texture minification function}
+    {tex:minf}{texture}
+\doentry{tex-magnify}{n \times Z_2}{see \ref{texturing}}{GetTexParameter}
+    {TEXTURE\_MAG\_FILTER}{Texture magnification function}
+    {tex:magf}{texture}
+
+% ARB_texture_border_clamp (change)
+% ARB_texture_mirrored_repeat
+\doentry{tex-wrap-s}{n \times Z_2}{\glc{REPEAT}}{GetTexParameter}
+    {TEXTURE\_WRAP\_S}{Texcoord $s$ wrap mode}{tex:wrap}{texture}
+\doentry{tex-wrap-t}{n \times Z_2}{\glc{REPEAT}}{GetTexParameter}
+    {TEXTURE\_WRAP\_T}{Texcoord $t$ wrap mode}
+    {tex:wrap}{texture}
+% End ARB_texture_mirrored_repeat
+% End ARB_texture_border_clamp
+
+% SGIS_generate_mipmap
+\doentry{tex-generate-mipmap}{n \times B}{\glc{FALSE}}{GetTexParameter}
+    {GENERATE\_MIPMAP}{Automatic mipmap generation}{tex:minf}{texture}
+% End SGIS_generate_mipmap
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+% \begin{statetable}[\dobar]{Textures (state per texture image)}{statetab:texture1}   % 6.17
+% \newfixstart
+% % State per image array
+% \doentry{tex-image-width}{n \times Z^{+}}{0}{--}
+%     {TEXTURE\_WIDTH}{texture image's specified width}{texturing}{--}
+% \doentry{tex-image-height}{n \times Z^{+}}{0}{--}
+%     {TEXTURE\_HEIGHT}{texture image's specified height}{texturing}{--}
+% \doentry{tex-components}{n \times Z_{42*}}{1}{--}
+%     {TEXTURE\_INTERNAL\_FORMAT \hbox{(TEXTURE\_COMPONENTS)}}
+%     {texture image's internal image format}{texturing}{--}
+% \doentry{tex-red-size}{n \times Z^{+}}{0}{--}
+%     {TEXTURE\_RED\_SIZE}{texture image's red resolution}{texturing}{--}
+% \doentry{tex-green-size}{n \times Z^{+}}{0}{--}
+%     {TEXTURE\_GREEN\_SIZE}{texture image's green resolution}{texturing}{--}
+% \doentry{tex-blue-size}{n \times Z^{+}}{0}{--}
+%     {TEXTURE\_BLUE\_SIZE}{texture image's blue resolution}{texturing}{--}
+% \doentry{tex-alpha-size}{n \times Z^{+}}{0}{--}
+%     {TEXTURE\_ALPHA\_SIZE}{texture image's alpha resolution}{texturing}{--}
+% \doentry{tex-luminance-size}{n \times Z^{+}}{0}{--}
+%     {TEXTURE\_LUMINANCE\_SIZE}{texture image's luminance resolution}
+%     {texturing}{--}
+%
+% %% Moved back from next table
+% % ARB_texture_compression
+% \doentry{tex-compressed}{n \times B}{{\em False}}{--}
+%     {TEXTURE\_COMPRESSED}{True if texture image has a compressed internal format}
+%     {tex:compteximg}{-}
+% \doentry{tex-compressed-size}{n \times Z^{+}}{0}{--}
+%     {TEXTURE\_COMPRESSED\_IMAGE\_SIZE}
+%     {size (in {\tt ubyte}\/s) of compressed texture image}{tex:compteximg}{-}
+% % End ARB_texture_compression
+%
+% \hline
+% \end{tabular}
+% \end{statetable}
+
+
+\begin{statetable}[\dobar]{Texture Environment and Generation}{statetab:texenv}     % 6.18
+\newstart
+
+% ARB_multitexture
+\doentry{current-active-texture}{Z_{\mtexnum}}{\glc{TEXTURE0}}
+    {GetIntegerv}{ACTIVE\_TEXTURE}
+    {Active texture unit selector}{vert:spec}{texture}
+\doentry{tex-function}{\mtexnum \times Z_6}{\glc{MODULATE}}{GetTexEnviv}  % NEW{2}
+    {TEXTURE\_ENV\_MODE}{Texture application function}
+    {tex:env}{texture}
+\doentry{tex-tv-color}{\mtexnum \times C}{0,0,0,0}{GetTexEnvfv}
+    {TEXTURE\_ENV\_COLOR}{Texture environment color}
+    {tex:env}{texture}
+
+% OES_point_sprite
+\doentry{pnt-sprite-coord-replace}{\mtexnum \times B}{\em False}{GetTexEnviv}{COORD\_REPLACE\_OES}
+    {Point coordinate replacement enabled}{points}{texture}
+% End OES_point_sprite
+
+% End ARB_multitexture
+% ARB_texture_env_combine
+\doentry{tex-rgb-combine}{\mtexnum \times Z_8}{\glc{MODULATE}}{GetTexEnviv}   % NEW{2}
+    {COMBINE\_RGB}{RGB combiner function}{tex:env}{texture}
+\doentry{tex-alpha-combine}{\mtexnum \times Z_6}{\glc{MODULATE}}{GetTexEnviv} % NEW{2}
+    {COMBINE\_ALPHA}{Alpha combiner function}{tex:env}{texture}
+\doentry{tex-rgb-src0}{\mtexnum \times Z_3}{\glc{TEXTURE}}{GetTexEnviv}
+    {SRC0\_RGB}{RGB source 0}{tex:env}{texture}
+\doentry{tex-rgb-src1}{\mtexnum \times Z_3}{\glc{PREVIOUS}}{GetTexEnviv}
+    {SRC1\_RGB}{RGB source 1}{tex:env}{texture}
+\doentry{tex-rgb-src2}{\mtexnum \times Z_3}{\glc{CONSTANT}}{GetTexEnviv}
+    {SRC2\_RGB}{RGB source 2}{tex:env}{texture}
+\doentry{tex-alpha-src0}{\mtexnum \times Z_3}{\glc{TEXTURE}}{GetTexEnviv}
+    {SRC0\_ALPHA}{Alpha source 0}{tex:env}{texture}
+\doentry{tex-alpha-src1}{\mtexnum \times Z_3}{\glc{PREVIOUS}}{GetTexEnviv}
+    {SRC1\_ALPHA}{Alpha source 1}{tex:env}{texture}
+\doentry{tex-alpha-src2}{\mtexnum \times Z_3}{\glc{CONSTANT}}{GetTexEnviv}
+    {SRC2\_ALPHA}{Alpha source 2}{tex:env}{texture}
+\doentry{tex-rgb-operand0}{\mtexnum \times Z_4}{\glc{SRC\_COLOR}}{GetTexEnviv}    % NEW{2}
+    {OPERAND0\_RGB}{RGB operand 0}{tex:env}{texture}
+\doentry{tex-rgb-operand1}{\mtexnum \times Z_4}{\glc{SRC\_COLOR}}{GetTexEnviv}    % NEW{2}
+    {OPERAND1\_RGB}{RGB operand 1}{tex:env}{texture}
+\doentry{tex-rgb-operand2}{\mtexnum \times Z_4}{\glc{SRC\_ALPHA}}{GetTexEnviv}    % NEW{2}
+    {OPERAND2\_RGB}{RGB operand 2}{tex:env}{texture}
+\doentry{tex-alpha-operand0}{\mtexnum \times Z_2}{\glc{SRC\_ALPHA}}{GetTexEnviv}  % NEW{2}
+    {OPERAND0\_ALPHA}{Alpha operand 0}{tex:env}{texture}
+\doentry{tex-alpha-operand1}{\mtexnum \times Z_2}{\glc{SRC\_ALPHA}}{GetTexEnviv}  % NEW{2}
+    {OPERAND1\_ALPHA}{Alpha operand 1}{tex:env}{texture}
+\doentry{tex-alpha-operand2}{\mtexnum \times Z_2}{\glc{SRC\_ALPHA}}{GetTexEnviv}  % NEW{2}
+    {OPERAND2\_ALPHA}{Alpha operand 2}{tex:env}{texture}
+\doentry{tex-rgb-scale}{\mtexnum \times R_3}{1.0}{GetTexEnvfv}
+    {RGB\_SCALE}{RGB post-combiner scaling}{tex:env}{texture}
+\doentry{tex-alpha-scale}{\mtexnum \times R_3}{1.0}{GetTexEnvfv}
+    {ALPHA\_SCALE}{Alpha post-combiner scaling}{tex:env}{texture}
+% End ARB_texture_env_combine
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}[\dobar]{Pixel Operations}{statetab:pixop}                        % 6.19
+\newstart
+\doentry{scissor-enable}{B}{\em False}{IsEnabled}{SCISSOR\_TEST}
+    {Scissoring enabled}{scissor}{scissor/enable}
+\doentry{scissor-box}{4 \times Z}{see~\ref{scissor}}{GetIntegerv}{SCISSOR\_BOX}
+    {Scissor box}{scissor}{scissor}
+
+\doentry{atest-enable}{B}{\em False}{IsEnabled}{ALPHA\_TEST}
+    {Alpha test enabled}{alpha:test}{color-buffer/enable}
+\doentry{atest-func}{Z_8}{\glc{ALWAYS}}{GetIntegerv}{ALPHA\_TEST\_FUNC}
+    {Alpha test function}{alpha:test}{color-buffer}
+\doentry{afunction-ref}{R^{+}}{0}{GetIntegerv}{ALPHA\_TEST\_REF}
+    {Alpha test reference value}{alpha:test}{color-buffer}
+
+\doentry{stencil-enable}{B}{\em False}{IsEnabled}{STENCIL\_TEST}
+    {Stenciling enabled}{stencil}{stencil-buffer/enable}
+\doentry{stencil-func}{Z_8}{\glc{ALWAYS}}{GetIntegerv}{STENCIL\_FUNC}
+    {Stencil function}{stencil}{stencil-buffer}
+\doentry{stencil-mask}{Z^{+}}{1's}{GetIntegerv}{STENCIL\_VALUE\_MASK}
+    {Stencil mask}{stencil}{stencil-buffer}
+\doentry{stencil-ref}{Z^{+}}{0}{GetIntegerv}{STENCIL\_REF}
+    {Stencil reference value}{stencil}{stencil-buffer}
+\doentry{stencil-fail-action}{Z_6}{\glc{KEEP}}{GetIntegerv}
+    {STENCIL\_FAIL}{Stencil fail action}{stencil}{stencil-buffer}
+\doentry{stencil-zfail-action}{Z_6}{\glc{KEEP}}{GetIntegerv}
+    {STENCIL\_PASS\_DEPTH\_FAIL}{Stencil depth buffer fail action}
+    {stencil}{stencil-buffer}
+\doentry{stencil-zpass-action}{Z_6}{\glc{KEEP}}{GetIntegerv}
+    {STENCIL\_PASS\_DEPTH\_PASS}{Stencil depth buffer pass action}
+    {stencil}{stencil-buffer}
+
+\doentry{depthbuffer-enable}{B}{\em False}{IsEnabled}{DEPTH\_TEST}
+    {Depth buffer enabled}{zbuffer}{depth-buffer/enable}
+\doentry{depthbuffer-function}{Z_8}{\glc{LESS}}{GetIntegerv}{DEPTH\_FUNC}
+    {Depth buffer test function}{zbuffer}{depth-buffer}
+
+\doentry{blend-enable}{B}{\em False}{IsEnabled}{BLEND}
+    {Blending enabled}{blending}{color-buffer/enable}
+\doentry{blend-source-rgb-function}{Z_{9}}{\glc{ONE}}{GetIntegerv}
+    {BLEND\_SRC}
+    {Blending source function}{blending}{color-buffer}
+\doentry{blend-dest-rgb-function}{Z_{8}}{\glc{ZERO}}{GetIntegerv}
+    {BLEND\_DST}
+    {Blending dest. function}{blending}{color-buffer}
+
+\doentry{dither-enable}{B}{\em True}{IsEnabled}{DITHER}
+    {Dithering enabled}{dither}{color-buffer/enable}
+
+\doentry{color-logic-op-enable}{B}{\em False}{IsEnabled}
+    {COLOR\_LOGIC\_OP}{Color logic op enabled}{logicop}{color-buffer/enable}
+\doentry{logic-op-function}{Z_{16}}{\glc{COPY}}{GetIntegerv}
+    {LOGIC\_OP\_MODE}{Logic op function}{logicop}{color-buffer}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}{Framebuffer Control}{statetab:framebuf}                          % 6.20
+\newstart
+\doentry{write-planes}{4 \times B}{{\em True}}{GetBooleanv}{COLOR\_WRITEMASK}
+    {Color write enables; R, G, B, or A}{writemask}{color-buffer}
+\doentry{zwritemask}{B}{{\em True}}{GetBooleanv}{DEPTH\_WRITEMASK}
+    {Depth buffer enabled for writing}{writemask}{depth-buffer}
+\doentry{swritemask}{Z^{+}}{1's}{GetIntegerv}{STENCIL\_WRITEMASK}
+    {Stencil buffer writemask}{writemask}{stencil-buffer}
+\doentry{color-clear}{C}{0,0,0,0}{GetFloatv}{COLOR\_CLEAR\_VALUE}
+    {Color buffer clear value (RGBA mode)}{clear}{color-buffer}
+\doentry{depthbuffer-clear}{R^{+}}{1}{GetIntegerv}{DEPTH\_CLEAR\_VALUE}
+    {Depth buffer clear value}{clear}{depth-buffer}
+\doentry{stencil-clear}{Z^{+}}{0}{GetIntegerv}{STENCIL\_CLEAR\_VALUE}
+    {Stencil clear value}{clear}{stencil-buffer}
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}{Pixels}{statetab:pixels}                                         % 6.21
+\newstart
+\doentry{unpack-alignment}{Z^{+}}{4}{GetIntegerv}{UNPACK\_ALIGNMENT}
+    {Value of \glc{UNPACK\_ALIGNMENT}}{pix:storemode}{pixel-store}
+\doentry{alignment}{Z^{+}}{4}{GetIntegerv}{PACK\_ALIGNMENT}
+    {Value of \glc{PACK\_ALIGNMENT}}{pix:read}{pixel-store}
+\hline
+\end{tabular}
+\end{statetable}
+
+%%\newshortcommandstart
+
+\begin{statetable}[\dobar]{Hints}{statetab:hints}                                   % 6.27
+\newstart
+\doentry{perspective-hint}{Z_3}{\glc{DONT\_CARE}}{GetIntegerv}
+    {PERSPECTIVE\_CORRECTION\_HINT}{Perspective correction hint}{hints}{hint}
+\doentry{point-smooth-hint}{Z_3}{\glc{DONT\_CARE}}{GetIntegerv}
+    {POINT\_SMOOTH\_HINT}{Point smooth hint}{hints}{hint}
+\doentry{line-smooth-hint}{Z_3}{\glc{DONT\_CARE}}{GetIntegerv}
+    {LINE\_SMOOTH\_HINT}{Line smooth hint}{hints}{hint}
+\doentry{fog-hint}{Z_3}{\glc{DONT\_CARE}}{GetIntegerv}
+    {FOG\_HINT}{Fog hint}{hints}{hint}
+
+% SGIS_generate_mipmap
+\doentry{generate-mipmap-hint}{Z_3}{\glc{DONT\_CARE}}{GetIntegerv}
+    {GENERATE\_MIPMAP\_HINT}{Mipmap generation hint}{hints}{hint}
+% End SGIS_generate_mipmap
+
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}[\dobar]{Implementation Dependent Values}{statetab:impl}          % 6.28
+\newlimitstart
+\doentry{max-lights}{Z^{+}}{8}{GetIntegerv}{MAX\_LIGHTS}
+    {Maximum number of lights}{lighting}{--}
+\doentry{max-planes}{Z^{+}}{1}{GetIntegerv}{MAX\_CLIP\_PLANES}
+    {Maximum number of user clipping planes}{clipping}{--}
+\doentry{mv-depth}{Z^{+}}{16}{GetIntegerv}{MAX\_MODELVIEW\_STACK\_DEPTH}
+    {Maximum model-view stack depth}{matrices}{--}
+\doentry{proj-depth}{Z^{+}}{2}{GetIntegerv}{MAX\_PROJECTION\_STACK\_DEPTH}
+    {Maximum projection matrix stack depth}{matrices}{--}
+\doentry{tex-depth}{Z^{+}}{2}{GetIntegerv}{MAX\_TEXTURE\_STACK\_DEPTH}
+    {Maximum number depth of texture matrix stack}{matrices}{--}
+\doentry{subpixel-bits}{Z^{+}}{4}{GetIntegerv}{SUBPIXEL\_BITS}
+    {Number of bits of subpixel precision in screen $x_w$ and $y_w$}{rasterization}{--}
+\doentry{max-tex-dim}{Z^{+}}{64}{GetIntegerv}{MAX\_TEXTURE\_SIZE}
+    {Maximum texture image dimension}{tex:spec}{--}
+\doentry{max-viewport}{2 \times Z^+}{see \ref{view:port}}{GetIntegerv}
+    {MAX\_VIEWPORT\_DIMS}{Maximum viewport dimensions}{view:port}{--}
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}{Implementation Dependent Values (cont.)}{statetab:impl1}         % 6.29
+%%\newshortlimitstart
+\tabheader{|p{1.6in}||c|p{1in}|c|p{1.5in}|c|c|}{Minimum}
+\doentry{aliased-point-width-range}{2 \times R^{+}}{1,1}
+    {GetFloatv}{ALIASED\_POINT\_SIZE\_RANGE}
+    {Range (lo to hi) of aliased point sizes}{points}{--}
+\doentry{point-width-range}{2 \times R^{+}}{1,1}
+    {GetFloatv}{SMOOTH\_POINT\_SIZE\_RANGE (POINT\_SIZE\_RANGE)}
+    {Range (lo to hi) of antialiased point sizes}{points}{--}
+\doentry{aliased-line-width-range}{2 \times R^{+}}{1,1}{GetFloatv}
+    {ALIASED\_LINE\_WIDTH\_RANGE}
+    {Range (lo to hi) of aliased line widths}{lines}{--}
+\doentry{line-width-range}{2 \times R^{+}}{1,1}{GetFloatv}
+    {SMOOTH\_LINE\_WIDTH\_RANGE (v1.1:~LINE\_WIDTH\_RANGE)}
+    {Range (lo to hi) of antialiased line widths}{lines}{--}
+\hline
+\end{tabular}
+\end{statetable}
+
+% Added a third page of implementation-dependent state tables
+\begin{statetable}{Implementation Dependent Values (cont.)}{statetab:impl2}         % 6.30
+\newshortlimitstart
+
+% ARB_multitexture (new)
+\doentry{max-active-textures}{Z^{+}}{2}{GetIntegerv}{MAX\_TEXTURE\_UNITS}  % 1->2 ala \mtexnum
+    {Number of texture units (not to exceed 32)}{bgn:end:p}{--}
+% End ARB_multitexture
+
+% ARB_multisample (new)
+\doentry{multisample-buffers}{Z^{+}}{0}{GetIntegerv}{SAMPLE\_BUFFERS}
+    {Number of multisample buffers}{multisample}{--}
+\doentry{multisample-mask-bits}{Z^{+}}{0}{GetIntegerv}{SAMPLES}
+    {Coverage mask size}{multisample}{--}
+% End ARB_multisample
+
+% ARB_texture_compression
+\doentry{tex-compression-formats}{10 \times Z}{-}{GetIntegerv}
+    {COMPRESSED\_TEXTURE\_FORMATS}
+    {Enumerated compressed texture formats}{tex:compteximg}{--}
+\doentry{tex-num-compression-formats}{Z}{10}{GetIntegerv}
+    {NUM\_COMPRESSED\_TEXTURE\_FORMATS}
+    {Number of enumerated compressed texture formats}{tex:compteximg}{--}
+% End ARB_texture_compression
+
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}{Implementation Dependent Pixel Depths}{statetab:impldepth}       % 6.31
+\newstart
+\doentry{$x$-bits}{Z^{+}}{-}{GetIntegerv}{$x$\_BITS}
+    {Number of bits in $x$ color buffer component;
+$x$ is one of \glc{RED}, \glc{GREEN},
+\glc{BLUE}, or \glc{ALPHA}}{framebuf}{--}
+
+\doentry{depth-bits}{Z^{+}}{-}{GetIntegerv}{DEPTH\_BITS}
+    {Number of depth buffer planes}{framebuf}{--}
+\doentry{stencil-bits}{Z^{+}}{-}{GetIntegerv}{STENCIL\_BITS}
+    {Number of stencil planes}{framebuf}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}{Miscellaneous}{statetab:misc}                                    % 6.32
+\newstart
+\doentry{errors}{n \times Z_8}{0}{GetError}{-}
+    {Current error code(s)}{errors}{--}
+\doentry{error-flags}{n \times B}{\em False}{--}{-}
+    {True if there is a corresponding error}{errors}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+%
+\normalsize
+

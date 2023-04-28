@@ -1,0 +1,1422 @@
+% Copyright 2008-2022 The Khronos Group Inc.
+% Copyright 1992-2005 Silicon Graphics, Inc.
+% SPDX-License-Identifier: CC-BY-4.0
+
+\chapter{State Tables}                                              % Sec. 6.2      state:tables
+\label{state:tables}
+
+The tables on the following pages indicate which state variables are
+obtained with what commands. State variables that can be obtained using any
+of \glr{GetBooleanv}, \glr{GetIntegerv}, \glr{GetInteger64v}, or
+\glr{GetFloatv} are listed with just one of these commands -- the one that
+is most appropriate given the type of the data to be returned. These state
+variables cannot be obtained using \glr{IsEnabled}. However, state variables
+for which \glr{IsEnabled} is listed as the query command can also be
+obtained using \glr{GetBooleanv}, \glr{GetIntegerv}, \glr{GetInteger64v},
+and \glr{GetFloatv}. State variables for which any other command is listed
+as the query command can be obtained by using that command or any of its
+typed variants, although information may be lost when not using the listed
+command. Unless otherwise specified, when floating-point state is returned
+as integer values or integer state is returned as floating-point values it
+is converted in the fashion described in section~\ref{dataconv:query}.
+
+State table entries indicate a type for each variable. Table~\ref{tab:acats}
+explains these types. The type actually identifies all state associated with
+the indicated description; in certain cases only a portion of this state is
+returned. This is the case with textures, where only the selected texture or
+texture parameter is returned.
+
+The abbreviations \arg{max}, \arg{min}, and \arg{no.} are used
+interchangeably with \arg{maximum}, \arg{minimum}, and \arg{number},
+respectively, to help fit tables without overflowing pages.
+
+\begin{table}      % State variable types                                                          % Table 6.2     tab:acats   (dep: 6.3)
+\begin{center}
+\begin{tabular}{|c|p{3in}|}
+\hline
+Type code & Explanation \\ \hline \hline
+$B$             & Boolean                                                   \\ \hline
+$BMU$           & Basic machine units                                       \\ \hline
+$C$             & Color (floating-point R, G, B, and A values)              \\ \hline
+$E$             & Enumerated value (as described in spec body)              \\ \hline
+$Z$             & Integer                                                   \\ \hline
+$Z^{+}$         & Non-negative integer or enumerated token value            \\ \hline
+$Z_k$, $Z_{k*}$ & $k$-valued integer ($k*$ indicates $k$ is minimum)        \\ \hline
+$R$             & Floating-point number                                     \\ \hline
+$R^{+}$         & Non-negative floating-point number                        \\ \hline
+$R^{[a,b]}$     & Floating-point number in the range $[a,b]$                \\ \hline
+$R^k$           & $k$-tuple of floating-point numbers                       \\ \hline
+$S$             & null-terminated string                                    \\ \hline
+$I$             & Image                                                     \\ \hline
+$Y$             & Pointer (data type unspecified)                           \\ \hline
+$n \times type$ & $n$ copies of type $type$ ($n*$ indicates $n$ is minimum) \\ \hline
+\end{tabular}
+\end{center}
+\caption{State Variable Types}
+\label{tab:acats}
+\end{table}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Now the actual state tables begin
+
+%% 2015/06 - something changed that made this pagebreak fail to do its job,
+%% causing table statetab:current to start on the same page and overlap with
+%% table tab:acats above. This bogus empty table seems to be the only fix,
+%% as \newpage and \pagebreak[4] don't help the situation.
+
+\begin{table}
+\begin{center}
+\begin{tabular}{l}
+\end{tabular}
+\end{center}
+\end{table}
+
+%% \newpage
+%% \pagebreak[4]
+\vfill\eject
+
+% Try to make footers not run into long table titles
+\addtolength{\footskip}{0.6in}
+
+%variable-name  type  default  get-routine  get-name  brief-desc  see-section
+%                                   attribute-class
+\small
+
+% For "footnotes" in table entries where we can't make actual footnotes
+\def\fn1{$\dagger$}
+\def\fnb{$\ddagger$}
+
+% Define some required minimum numbers used as multipliers
+% \mteximage -> combined texture images for texture bindings and server active texture
+% \mvtxattr  -> vertex attributes
+% Also, 16 texture samplers each for vertex and fragment shaders, but don't
+% parameterize that, hardcode it below.
+
+\def\mteximage{96}              % MAX_COMBINED_TEXTURE_IMAGE_UNITS
+\def\mvtxattr{16}               % MAX_VERTEX_ATTRIBS
+\def\mimageunit{4}              % MAX_IMAGE_UNITS
+\def\mtexbasefmt{6}             % No. of base internal texture formats
+\def\mdrawbuf{4}                % MAX_DRAW_BUFFERS
+\def\mblockstage{12}            % MAX_<stage>_UNIFORM_BLOCKS
+\def\mblockcombined{60}         % MAX_COMBINED_UNIFORM_BLOCKS
+
+% Useful macro
+\def\bgl#1{{\bf Begin/End #1}}
+
+% Commonly used data types
+\def\Enum{E}
+\def\Zplus{Z^{+}}
+
+% \ifnum\specfuncindex=1
+% \def\glr#1{{\bf{}#1\index[func]{#1}}}
+% \else
+% \def\glr#1{{\bf{}#1\index{#1}}}
+% \fi
+
+% \doentry defines one row of a GL state table
+% \cbentry is like \doentry, but places a change symbol in the row
+%   (since change bars don't work properly on these landscape-format tables).
+%   It also changes the caption to include a change bar.
+    \def\foof{-}
+    % fmtentry
+    %   #1 -> prefix command for each entry (typically a \color command)
+    %   #2 -> \rowcolor command (if any)
+    %   #3 -> Get Value (token name)        WAS #6
+    %   #4 -> Type                          WAS #3
+    %   #5 -> Get Command                   WAS #5 (unchanged)
+    %   #6 -> Initial/Minimum Value         WAS #4
+    %   #7 -> Description                   WAS #7 (unchanged)
+    %   #8 -> Section reference             WAS #8 (unchanged)
+    %   #9 -> Attribute Group               WAS #9 (unchanged)
+
+    %% I've attempted to do this with \newcommand and failed utterly.
+      \def\fmtentry#1#2#3#4#5#6#7#8#9{\hline
+        #2 \color{#1}
+            \def\foo{#3}
+            \if \foo \foof {\tiny --} \else {\raggedright \tiny #3}\wrcon{#3}\index{#3} \fi &
+        \color{#1} #4 &
+        \color{#1} #5 &
+        \color{#1} #6 &
+        {\color{#1}#7} &
+        \color{#1} #8 \\}
+
+      %% \change entries create a "CHANGED ITEMS" index entry for \cbentry
+    \def\doentry#1#2#3#4#5#6#7{\fmtentry{black}{}{#1}{#2}{#3}{#4}{#5}{#6}{#7}}
+    \def\cbentry#1#2#3#4#5#6#7{\fmtentry{\changecolor}{}{#1}{#2}{#3}{#4\change{}}{#5}{#6}{#7}}
+    \def\ocbentry#1#2#3#4#5#6#7{\fmtentry{\ochangecolor}{}{#1}{#2}{#3}{#4\ochange{}}{#5}{#6}{#7}}
+
+% A deleted table entry
+\def\delentry#1#2#3#4#5#6#7#8{}
+
+% tabheader starts a state table
+% arguments are
+%   \tabheader{fieldformat}{nameOfValueField}
+% Only do attribute group column in the non-deprecated spec
+\newcommand{\tabheader}[2]{\hsize=800pt
+  \begin{tabular}{#1}
+  \multicolumn{1}{c}{Get value} &
+  \multicolumn{1}{c}{Type} &
+  \multicolumn{1}{c}{\vbox{\hbox{Get}\vskip 2pt\hbox{Command}}} &
+  \multicolumn{1}{c}{\vbox{\hbox{#2}\vskip 2pt\hbox{Value}}} &
+  \multicolumn{1}{c}{Description} &
+  \multicolumn{1}{c}{Sec.} \\
+}
+
+% Start a state table
+%   \newstart               - default format
+%   \newshortcommentstart   - narrower comment column
+%   \newshortcommandstart   - narrower GL command column
+%   \newfixstart            - fixed width enumerant (state name) column
+%   \newfixshortvaluestart  - fixed width enumerant, narrower initial value column
+%   \newlimitstart          - for state with minimum, rather than initial, values
+%   \newshortlimitstart     - with narrower get value and GL command columns
+
+    %@@@ some trial stuff for embedding \parbox in description fields per
+    % http://patch.typepad.com/minor_details/2008/03/latex-table-col.html .
+    % However, using m{width} as the field format seems to work fine.
+    %\def\descsize{1.5in}
+    %\gdef\desc#1{\parbox[t]{\descsize}{\raggedright #1}}
+
+
+\def\newstart{\tabheader{|l||c|c|c|m{2in}|c|}{Initial}}
+\def\newshortcommentstart{\tabheader{|l||c|l|c|m{1.0in}|c|}{Initial}}
+\def\newshortcommandstart{\tabheader{|l||c|m{1.1in}|c|m{1.4in}|c|}{Initial}}
+\def\newfixstart{\tabheader{|m{1.6in}||c|l|c|m{1.4in}|c|}{Initial}}
+\def\newfixshortvaluestart{\tabheader{|m{1.4in}||c|m{1.2in}|m{0.6in}|m{1.4in}|c|}{Initial}}
+\def\newlimitstart{\tabheader{|l||c|l|c|m{2in}|c|}{Minimum}}
+\def\newshortlimitstart{\tabheader{|m{2in}||c|m{1.1in}|c|m{1.4in}|c|}{Minimum}}
+
+% \begin{statetable}[cbflag]{title}{label}
+%   cbflag should be '1' if changebars on the caption are desired
+%   title is the table caption; label is the TeX reference.
+%   \dobar is defined to '1' so it can be used for a visual cue -
+%       write \begin{statetable}[\dobar].
+\def\dobar{1}
+\newenvironment{statetable}[3][0]{
+    \enlargethispage*{2in}  % Fit table + caption down to \pagebreak below
+    % Save parameters for the caption/table index
+    \def\sttitle{#2}
+    \def\stlabel{#3}
+    % Define version of the table caption with changebars, if appropriate
+    \ifnum#1=1
+        \def\stcbtitle{\change \sttitle}
+    \else
+        \def\stcbtitle{\sttitle}
+    \fi
+    % Start the table, centered, oriented sideways
+    \begin{center}
+    \refstepcounter{table}{\belowpdfbookmark{{\thetable} {\sttitle}}{bkmk\stlabel}}
+    \begin{sideways}
+}{
+    % End the sideways table
+    \end{sideways}
+    % Caption and table index
+    \vskip \baselineskip
+    {\large Table {\thetable}: \stcbtitle}
+    \label{\stlabel}   % must follow \refstepcounter before \addcontentsline
+    \addcontentsline{lot}{table}{\protect\numberline{\thetable}{\sttitle}}
+    % Center both table and caption
+    \end{center}
+    \pdfpageattr=\expandafter{\the\pdfpageattr /Rotate 90}
+    \pagebreak          % Fit table + caption from \enlargethispage* above
+}
+
+% This one allows us to have a state table with a different caption for the index
+\def\dobar{1}
+\newenvironment{statetabledifferentindexcaption}[4][0]{
+    \enlargethispage*{2in}  % Fit table + caption down to \pagebreak below
+    % Save parameters for the caption/table index
+    \def\sttitle{#2}
+    \def\stlabel{#3}
+    \def\stindextitle{#4}
+    % Define version of the table caption with changebars, if appropriate
+    \ifnum#1=1
+        \def\stcbtitle{\change \sttitle}
+    \else
+        \def\stcbtitle{\sttitle}
+    \fi
+    % Start the table, centered, oriented sideways
+    \begin{center}
+    \refstepcounter{table}{\belowpdfbookmark{{\thetable} {\stindextitle}}{bkmk\stlabel}}
+    \begin{sideways}
+}{
+    % End the sideways table
+    \end{sideways}
+    % Caption and table index
+    \vskip \baselineskip
+    {\large Table {\thetable}: \stcbtitle}
+    \label{\stlabel}   % must follow \refstepcounter before \addcontentsline
+    \addcontentsline{lot}{table}{\protect\numberline{\thetable}{\stindextitle}}
+    % Center both table and caption
+    \end{center}
+    \pdfpageattr=\expandafter{\the\pdfpageattr /Rotate 90}
+    \pagebreak          % Fit table + caption from \enlargethispage* above
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{statetable}{Current Values and Associated Data}{statetab:current}                                % Table 23.2
+\newstart
+
+\doentry{PATCH\_VERTICES}{$\Zplus$}{\glr{GetIntegerv}}{3}{No. of vertices in input patch}{\ref{primtypes:patches}}{current}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetabledifferentindexcaption}{Vertex Array Object State {\par
+    \small \fn1 The $i$th attribute defaults to a value of
+    $i$.}}{statetab:vao3}{Vertex Array Object State}
+\newshortcommandstart
+
+\doentry{VERTEX\_ATTRIB\_ARRAY\_ENABLED}{$\mvtxattr* \times B$}{\glr{GetVertexAttribiv}}{\glc{FALSE}}{Vertex attrib array enable}{\ref{vert:array}}{vertex-array}
+\doentry{VERTEX\_ATTRIB\_ARRAY\_SIZE}{$\mvtxattr* \times Z_5$}{\glr{GetVertexAttribiv}}{4}{Vertex attrib array size}{\ref{vert:array}}{vertex-array}
+\doentry{VERTEX\_ATTRIB\_ARRAY\_STRIDE}{$\mvtxattr* \times \Zplus$}{\glr{GetVertexAttribiv}}{0}{Vertex attrib array stride}{\ref{vert:array}}{vertex-array}
+\doentry{VERTEX\_ATTRIB\_ARRAY\_TYPE}{$\mvtxattr* \times \Enum$}{\glr{GetVertexAttribiv}}{\glc{FLOAT}}{Vertex attrib array type}{\ref{vert:array}}{vertex-array}
+\doentry{VERTEX\_ATTRIB\_ARRAY\_NORMALIZED}{$\mvtxattr* \times B$}{\glr{GetVertexAttribiv}}{\glc{FALSE}}{Vertex attrib array normalized}{\ref{vert:array}}{vertex-array}
+\doentry{VERTEX\_ATTRIB\_ARRAY\_INTEGER}{$\mvtxattr* \times B$}{\glr{GetVertexAttribiv}}{\glc{FALSE}}{Vertex attrib array has unconverted integers}{\ref{vert:array}}{vertex-array}
+\doentry{VERTEX\_ATTRIB\_ARRAY\_DIVISOR}{$\mvtxattr* \times \Zplus$}{\glr{GetVertexAttribiv}}{0}{Vertex attrib array instance divisor}{\ref{vert:array:draw}}{vertex-array}
+\doentry{VERTEX\_ATTRIB\_ARRAY\_POINTER}{$\mvtxattr* \times Y$}{\glr{GetVertex\-AttribPointerv}}{\glc{NULL}}{Vertex attrib array pointer}{\ref{vert:array}}{vertex-array}
+
+\doentry{ELEMENT\_ARRAY\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Element array buffer binding}{\ref{vert:vbo:indices}}{vertex-array}
+\doentry{VERTEX\_ATTRIB\_ARRAY\_BUFFER\_BINDING}{$\mvtxattr* \times \Zplus$}{\glr{GetVertexAttribiv}}{0}{Attribute array buffer binding}{\ref{vert:vbo}}{vertex-array}
+
+\doentry{VERTEX\_ATTRIB\_BINDING}{$16 \times Z_{16*}$}{\glr{GetVertexAttribiv}}{$i$ \fn1}{Vertex buffer binding used by vertex attrib $i$}{\ref{vert:array}}{--}
+\doentry{VERTEX\_ATTRIB\_RELATIVE\_OFFSET}{$16 \times \Zplus$}{\glr{GetVertexAttribiv}}{0}{Byte offset added to vertex binding offset for this attribute}{\ref{vert:array}}{--}
+\doentry{VERTEX\_BINDING\_OFFSET}{$16 \times Z$}{\glr{GetInteger64i\_v}}{0}{Byte offset of the first element in data store of the buffer bound to vertex binding $i$}{\ref{vert:array}}{--}
+\doentry{VERTEX\_BINDING\_STRIDE}{$16 \times Z$}{\glr{GetIntegeri\_v}}{16}{Stride between elements in vertex binding $i$}{\ref{vert:array}}{--}
+\doentry{VERTEX\_BINDING\_DIVISOR}{$16 \times \Zplus$}{\glr{GetIntegeri\_v}}{0}{Instance divisor used for vertex binding $i$}{\ref{vert:array}}{--}
+\doentry{VERTEX\_BINDING\_BUFFER}{$16 \times \Zplus$}{\glr{GetIntegeri\_v}}{0}{Name of buffer bound to vertex binding $i$}{\ref{vert:array}}{--}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetable}{Vertex Array Data (not in vertex array objects)}{statetab:vertarray}         % Table 6.5
+\newshortcommandstart
+
+\doentry{ARRAY\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Current buffer binding}{\ref{vert:vbo}}{vertex-array}
+\doentry{DRAW\_INDIRECT\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Indirect command buffer binding}{\ref{vert:vbo:indirect}}{--}
+
+\doentry{VERTEX\_ARRAY\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Current vertex array object binding}{\ref{vert:vao}}{vertex-array}
+\doentry{PRIMITIVE\_RESTART\_FIXED\_INDEX}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Primitive restart with fixed index enable}{\ref{vert:array}}{vertex-array}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetabledifferentindexcaption}{Buffer Object State                                     % Table 6.6
+    {\par \small \fn1 This state may be queried with \glr{GetBufferParameteriv}, in which case
+    values greater than or equal to $2^{31}$ will be clamped to $2^{31}-1$.}}{statetab:vbostate}{Buffer Object State}
+\newstart
+
+\doentry{BUFFER\_SIZE}{$n \times \Zplus$}{\glr{GetBufferParameteri64v}}{0}{Buffer data size \fn1}{\ref{vert:vbo}}{-}
+\doentry{BUFFER\_USAGE}{$n \times \Enum$}{\glr{GetBufferParameteriv}}{\glc{STATIC\_DRAW}}{Buffer usage pattern}{\ref{vert:vbo}}{-}
+\doentry{BUFFER\_ACCESS\_FLAGS}{$n \times \Zplus$}{\glr{GetBufferParameteriv}}{0}{Extended buffer access flag}{\ref{vert:vbo}}{-}
+\doentry{BUFFER\_MAPPED}{$n \times B$}{\glr{GetBufferParameteriv}}{\glc{FALSE}}{Buffer map flag}{\ref{vert:vbo}}{-}
+\doentry{BUFFER\_MAP\_POINTER}{$n \times Y$}{\glr{GetBufferPointerv}}{\glc{NULL}}{Mapped buffer pointer}{\ref{vert:vbo}}{-}
+\doentry{BUFFER\_MAP\_OFFSET}{$n \times \Zplus$}{\glr{GetBufferParameteri64v}}{0}{Start of mapped buffer range}{\ref{vert:vbo}}{-}
+\doentry{BUFFER\_MAP\_LENGTH}{$n \times \Zplus$}{\glr{GetBufferParameteri64v}}{0}{Size of mapped buffer range}{\ref{vert:vbo}}{-}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetable}{Transformation State}{statetab:transform}                                    % Table 6.7
+\newfixstart
+
+\doentry{VIEWPORT}{$4 \times Z$}{\glr{GetIntegerv}}{see~\ref{view:port}}{Viewport origin \& extent}{\ref{view:port}}{viewport}
+\doentry{DEPTH\_RANGE}{$2 \times R^{+}$}{\glr{GetFloatv}}{0,1}{Depth range near \& far}{\ref{view:port}}{viewport}
+
+% transform_feedback2
+\doentry{TRANSFORM\_FEEDBACK\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Object bound for transform feedback operations}{\ref{xformfeedback}}{--}
+  % Moved from Transform Feedback (object) State per gitlab #66
+\ocbentry{TRANSFORM\_FEEDBACK\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Buffer object bound to generic bind point for transform feedback}{\ref{state:bufobjquery}}{--}
+
+\doentry{PRIMITIVE\_BOUNDING\_BOX}{$8 \times R$}{\glr{GetFloatv}}{$(-1,-1,-1, 1, 1, 1, 1, 1)$}{Default primitive bounding box}{\ref{prim:bbox}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Rasterization}{statetab:raster}                                              % Table 6.9
+\newstart
+
+\doentry{RASTERIZER\_DISCARD}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Discard primitives before rasterization}{\ref{rast:discard}}{--}
+\doentry{LINE\_WIDTH}{$R^{+}$}{\glr{GetFloatv}}{1.0}{Line width}{\ref{lines}}{line}
+
+\doentry{CULL\_FACE}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Polygon culling enabled}{\ref{ppoly:ras}}{polygon/enable}
+\doentry{CULL\_FACE\_MODE}{$\Enum$}{\glr{GetIntegerv}}{\glc{BACK}}{Cull front-/back-facing polygons}{\ref{ppoly:ras}}{polygon}
+\doentry{FRONT\_FACE}{$\Enum$}{\glr{GetIntegerv}}{\glc{CCW}}{Polygon frontface CW/CCW indicator}{\ref{ppoly:ras}}{polygon}
+\doentry{POLYGON\_OFFSET\_FACTOR}{$R$}{\glr{GetFloatv}}{0}{Polygon offset factor}{\ref{polyoffset}}{polygon}
+\doentry{POLYGON\_OFFSET\_UNITS}{$R$}{\glr{GetFloatv}}{0}{Polygon offset units}{\ref{polyoffset}}{polygon}
+\doentry{POLYGON\_OFFSET\_FILL}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Polygon offset enable}{\ref{polyoffset}}{polygon/enable}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetabledifferentindexcaption}{Multisampling
+    {\par \small \fn1 $n$ is the value of \glc{MAX\_SAMPLE\_MASK\_WORDS}.}}
+    {statetab:multisample}{Multisampling}                                                       % Table 6.11
+\newstart
+
+\doentry{SAMPLE\_ALPHA\_TO\_COVERAGE}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Modify coverage from alpha}{\ref{alpha:coverage}}{multisample/enable}
+\doentry{SAMPLE\_COVERAGE}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Mask to modify coverage}{\ref{multisample:fragment}}{multisample/enable}
+\doentry{SAMPLE\_COVERAGE\_VALUE}{$R^{+}$}{\glr{GetFloatv}}{1}{Coverage mask value}{\ref{multisample:fragment}}{multisample}
+\doentry{SAMPLE\_COVERAGE\_INVERT}{$B$}{\glr{GetBooleanv}}{\glc{FALSE}}{Invert coverage mask value}{\ref{multisample:fragment}}{multisample}
+
+\doentry{SAMPLE\_SHADING}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Sample shading enable}{\ref{multisample:fragment}}{multisample/enable}
+\doentry{MIN\_SAMPLE\_SHADING\_VALUE}{$R^{+}$}{\glr{GetFloatv}}{0}{Fraction of multisamples to use for sample shading}{\ref{multisample:shading}}{multisample}
+
+\doentry{SAMPLE\_MASK}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Additional sample mask}{\ref{multisample:fragment}}{--}
+\doentry{SAMPLE\_MASK\_VALUE}{$n \times \Zplus$ \fn1}{\glr{GetIntegeri\_v}}{All bits of all words set}{Additional sample mask value}{\ref{multisample:fragment}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetable}{Textures (selector, state per texture unit)}{statetab:texture}               % Table 6.12
+\newfixstart
+
+\doentry{ACTIVE\_TEXTURE}{$\Enum$}{\glr{GetIntegerv}}{\glc{TEXTURE0}}{Active texture unit selector}{\ref{vert:spec}}{texture}
+
+\doentry{TEXTURE\_BINDING\_$x$D}{$\mteximage* \times 2 \times \Zplus$}{\glr{GetIntegerv}}{0}{Texture object bound to \glc{TEXTURE\_$x$D}}{\ref{tex:object}}{texture}
+\doentry{TEXTURE\_BINDING\_2D\_ARRAY}{$\mteximage* \times \Zplus$}{\glr{GetIntegerv}}{0}{Texture object bound to \glc{TEXTURE\_2D\_ARRAY}}{\ref{tex:object}}{texture}
+\doentry{TEXTURE\_BINDING\_BUFFER}{$\mteximage* \times \Zplus$}{\glr{GetIntegerv}}{0}{Texture object bound to \glc{TEXTURE\_BUFFER}}{\ref{tex:object}}{texture}
+\doentry{TEXTURE\_BINDING\_CUBE\_MAP}{$\mteximage* \times \Zplus$}{\glr{GetIntegerv}}{0}{Texture object bound to \glc{TEXTURE\_CUBE\_MAP}}{\ref{tex:object}}{texture}
+\doentry{TEXTURE\_BINDING\_CUBE\_MAP\_ARRAY}{$\mteximage* \times \Zplus$}{\glr{GetIntegerv}}{0}{Texture object bound to \glc{TEXTURE\_CUBE\_MAP\_ARRAY}}{\ref{tex:object}}{texture}
+
+\doentry{TEXTURE\_BINDING\_2D\_MULTISAMPLE}{$\mteximage* \times \Zplus$}{\glr{GetIntegerv}}{0}{Texture object bound to \glc{TEXTURE\_2D\_MULTISAMPLE}}{\ref{tex:object}}{--}
+\doentry{TEXTURE\_BINDING\_2D\_MULTISAMPLE\_ARRAY}{$\mteximage* \times \Zplus$}{\glr{GetIntegerv}}{0}{Texture object bound to \glc{TEXTURE\_2D\_MULTISAMPLE\_ARRAY}}{\ref{tex:object}}{--}
+
+\doentry{SAMPLER\_BINDING}{$\mteximage* \times \Zplus$}{\glr{GetIntegerv}}{0}{Sampler object bound to active texture unit}{\ref{tex:sampler}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Textures (state per texture object)}{statetab:texture2}                      % Table 6.14
+\newfixstart
+
+\doentry{TEXTURE\_SWIZZLE\_R}{$\Enum$}{\glr{GetTexParameter}}{\glc{RED}}{Red component swizzle}{\ref{tex:param}}{texture}
+\doentry{TEXTURE\_SWIZZLE\_G}{$\Enum$}{\glr{GetTexParameter}}{\glc{GREEN}}{Green component swizzle}{\ref{tex:param}}{texture}
+\doentry{TEXTURE\_SWIZZLE\_B}{$\Enum$}{\glr{GetTexParameter}}{\glc{BLUE}}{Blue component swizzle}{\ref{tex:param}}{texture}
+\doentry{TEXTURE\_SWIZZLE\_A}{$\Enum$}{\glr{GetTexParameter}}{\glc{ALPHA}}{Alpha component swizzle}{\ref{tex:param}}{texture}
+
+\doentry{TEXTURE\_BORDER\_COLOR}{$C$}{\glr{GetTexParameterfv}}{0.0,0.0,0.0,0.0}{Border color}{\ref{texturing}}{texture}
+\doentry{TEXTURE\_MIN\_FILTER}{$\Enum$}{\glr{GetTexParameter}}{see sec.~\ref{tex:state}}{Minification function}{\ref{tex:minf}}{texture}
+\doentry{TEXTURE\_MAG\_FILTER}{$\Enum$}{\glr{GetTexParameter}}{\glc{LINEAR}}{Magnification function}{\ref{tex:magf}}{texture}
+
+\doentry{TEXTURE\_WRAP\_S}{$\Enum$}{\glr{GetTexParameter}}{see sec.~\ref{tex:state}}{Texcoord $s$ wrap mode}{\ref{tex:minf:wrap}}{texture}
+\doentry{TEXTURE\_WRAP\_T}{$\Enum$}{\glr{GetTexParameter}}{see sec.~\ref{tex:state}}{Texcoord $t$ wrap mode (2D, 3D, cube map textures only)}{\ref{tex:minf:wrap}}{texture}
+\doentry{TEXTURE\_WRAP\_R}{$\Enum$}{\glr{GetTexParameter}}{see sec.~\ref{tex:state}}{Texcoord $r$ wrap mode (3D textures only)}{\ref{tex:minf:wrap}}{texture}
+
+\doentry{TEXTURE\_MIN\_LOD}{$R$}{\glr{GetTexParameterfv}}{-1000}{Min. level of detail}{\ref{texturing}}{texture}
+\doentry{TEXTURE\_MAX\_LOD}{$R$}{\glr{GetTexParameterfv}}{1000}{Max. level of detail}{\ref{texturing}}{texture}
+\doentry{TEXTURE\_BASE\_LEVEL}{$\Zplus$}{\glr{GetTexParameterfv}}{0}{Base texture array}{\ref{texturing}}{texture}
+\doentry{TEXTURE\_MAX\_LEVEL}{$\Zplus$}{\glr{GetTexParameterfv}}{1000}{Max. texture array level}{\ref{texturing}}{texture}
+
+\doentry{DEPTH\_STENCIL\_TEXTURE\_MODE}{$\Enum$}{\glr{GetTexParameteriv}}{\glc{DEPTH\_COMPONENT}}{Depth stencil texturemode}{\ref{tex:depthstencil}}{--}
+
+\doentry{TEXTURE\_COMPARE\_MODE}{$\Enum$}{\glr{GetTexParameteriv}}{\glc{NONE}}{Comparison mode}{\ref{tex:compare}}{texture}
+\doentry{TEXTURE\_COMPARE\_FUNC}{$\Enum$}{\glr{GetTexParameteriv}}{\glc{LEQUAL}}{Comparison function}{\ref{tex:compare}}{texture}
+
+\doentry{TEXTURE\_IMMUTABLE\_FORMAT}{$B$}{\glr{GetTexParameter}}{\glc{FALSE}}{Size and format immutable}{\ref{tex:immutable}}{texture}
+\doentry{TEXTURE\_IMMUTABLE\_LEVELS}{$\Zplus$}{\glr{GetTexParameter}}{0}{No. of levels in immutable textures}{\ref{tex:immutable}}{texture}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Textures (state per texture image)}{statetab:teximage}                       % Table 6.16 (dep: 6.22)
+\newfixstart
+
+\doentry{TEXTURE\_WIDTH}{$\Zplus$}{\glr{GetTexLevelParameter}}{0}{Specified width}{\ref{texturing}}{--}
+\doentry{TEXTURE\_HEIGHT}{$\Zplus$}{\glr{GetTexLevelParameter}}{0}{Specified height (2D/3D)}{\ref{texturing}}{--}
+\doentry{TEXTURE\_DEPTH}{$\Zplus$}{\glr{GetTexLevelParameter}}{0}{Specified depth (3D)}{\ref{texturing}}{--}
+
+\doentry{TEXTURE\_SAMPLES}{$\Zplus$}{\glr{GetTexLevelParameter}}{0}{No. of samples per texel}{\ref{tex:multisample}}{--}
+\doentry{TEXTURE\_FIXED\_SAMPLE\_LOCATIONS}{$B$}{\glr{GetTexLevelParameter}}{\glc{TRUE}}{Whether the image uses a fixed sample pattern}{\ref{tex:multisample}}{--}
+
+\doentry{TEXTURE\_INTERNAL\_FORMAT}{$\Enum$}{\glr{GetTexLevelParameteriv}}{\glc{RGBA} or \glc{R8}}{Internal format (see section~\ref{tex:state})}{\ref{texturing}}{--}
+
+\doentry{TEXTURE\_$x$\_SIZE}{$6 \times \Zplus$}{\glr{GetTexLevelParameter}}{0}{Component resolution ($x$ is \glc{RED}, \glc{GREEN}, \glc{BLUE}, \glc{ALPHA}, \glc{DEPTH}, or \glc{STENCIL})}{\ref{texturing}}{--}
+\doentry{TEXTURE\_SHARED\_SIZE}{$\Zplus$}{\glr{GetTexLevelParameter}}{0}{Shared exponent field resolution}{\ref{texturing}}{--}
+\doentry{TEXTURE\_$x$\_TYPE}{$\Enum$}{\glr{GetTexLevelParameter}}{\glc{NONE}}{Component type ($x$ is \glc{RED}, \glc{GREEN}, \glc{BLUE}, \glc{ALPHA}, or \glc{DEPTH})}{\ref{tex:query}}{--}
+
+\doentry{TEXTURE\_COMPRESSED}{$B$}{\glr{GetTexLevelParameter}}{\glc{FALSE}}{True if image has a compressed internal format}{\ref{tex:compteximg}}{--}
+  %% If this table is split, it affects references in the spec body!
+\doentry{TEXTURE\_BUFFER\_DATA\_STORE\_BINDING}{$\Zplus$}{\glr{GetTexLevelParameteriv}}{0}{Buffer object bound as the data store for the active image unit's buffer texture}{\ref{tex:texbo}}{texture}
+\doentry{TEXTURE\_BUFFER\_OFFSET}{$n \times Z$}{\glr{GetTexLevelParameteriv}}{0}{Offset into buffer's data store used for the active image unit's buffer texture}{\ref{tex:texbo}}{--}
+\doentry{TEXTURE\_BUFFER\_SIZE}{$n \times Z$}{\glr{GetTexLevelParameteriv}}{0}{Size of the buffer's data store used for the active image unit's buffer texture}{\ref{tex:texbo}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Textures (state per sampler object)}{statetab:sampler}                       % Table 6.16
+\newfixstart
+
+% State per sampler object
+\doentry{TEXTURE\_BORDER\_COLOR}{$C$}{\glr{GetSamplerParameterfv}}{0.0,0.0,0.0,0.0}{Border color}{\ref{texturing}}{--}
+\doentry{TEXTURE\_MIN\_FILTER}{$\Enum$}{\glr{GetSamplerParameter}}{\glc{NEAREST\_MIPMAP\_LINEAR}}{Minification function}{\ref{tex:minf}}{texture}
+\doentry{TEXTURE\_MAG\_FILTER}{$\Enum$}{\glr{GetSamplerParameter}}{\glc{LINEAR}}{Magnification function}{\ref{tex:magf}}{texture}
+
+\doentry{TEXTURE\_WRAP\_S}{$\Enum$}{\glr{GetSamplerParameter}}{\glc{REPEAT}}{Texcoord $s$ wrap mode}{\ref{tex:minf:wrap}}{texture}
+\doentry{TEXTURE\_WRAP\_T}{$\Enum$}{\glr{GetSamplerParameter}}{\glc{REPEAT}}{Texcoord $t$ wrap mode (2D, 3D, cube map textures only)}{\ref{tex:minf:wrap}}{texture}
+\doentry{TEXTURE\_WRAP\_R}{$\Enum$}{\glr{GetSamplerParameter}}{\glc{REPEAT}}{Texcoord $r$ wrap mode (3D textures only)}{\ref{tex:minf:wrap}}{texture}
+\doentry{TEXTURE\_MIN\_LOD}{$R$}{\glr{GetSamplerParameterfv}}{-1000}{Min. level of detail}{\ref{texturing}}{texture}
+\doentry{TEXTURE\_MAX\_LOD}{$R$}{\glr{GetSamplerParameterfv}}{1000}{Max. level of detail}{\ref{texturing}}{texture}
+\doentry{TEXTURE\_COMPARE\_MODE}{$\Enum$}{\glr{GetSamplerParameteriv}}{\glc{NONE}}{Comparison mode}{\ref{tex:compare}}{texture}
+\doentry{TEXTURE\_COMPARE\_FUNC}{$\Enum$}{\glr{GetSamplerParameteriv}}{\glc{LEQUAL}}{Comparison function}{\ref{tex:compare}}{texture}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Pixel Operations}{statetab:pixop}                                            % Table 6.18
+\newstart
+
+\doentry{SCISSOR\_TEST}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Scissoring enabled}{\ref{scissor}}{scissor/enable}
+\doentry{SCISSOR\_BOX}{$4 \times Z$}{\glr{GetIntegerv}}{see~\ref{scissor}}{Scissor box}{\ref{scissor}}{scissor}
+
+\doentry{STENCIL\_TEST}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Stenciling enabled}{\ref{stencil}}{stencil-buffer/enable}
+\doentry{STENCIL\_FUNC}{$\Enum$}{\glr{GetIntegerv}}{\glc{ALWAYS}}{Front stencil function}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_VALUE\_MASK}{$\Zplus$}{\glr{GetIntegerv}}{see~\ref{stencil}}{Front stencil mask}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_REF}{$\Zplus$}{\glr{GetIntegerv}}{0}{Front stencil reference value}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_FAIL}{$\Enum$}{\glr{GetIntegerv}}{\glc{KEEP}}{Front stencil fail action}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_PASS\_DEPTH\_FAIL}{$\Enum$}{\glr{GetIntegerv}}{\glc{KEEP}}{Front stencil depth buffer fail action}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_PASS\_DEPTH\_PASS}{$\Enum$}{\glr{GetIntegerv}}{\glc{KEEP}}{Front stencil depth buffer pass action}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_BACK\_FUNC}{$\Enum$}{\glr{GetIntegerv}}{\glc{ALWAYS}}{Back stencil function}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_BACK\_VALUE\_MASK}{$\Zplus$}{\glr{GetIntegerv}}{see~\ref{stencil}}{Back stencil mask}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_BACK\_REF}{$\Zplus$}{\glr{GetIntegerv}}{0}{Back stencil reference value}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_BACK\_FAIL}{$\Enum$}{\glr{GetIntegerv}}{\glc{KEEP}}{Back stencil fail action}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_BACK\_PASS\_DEPTH\_FAIL}{$\Enum$}{\glr{GetIntegerv}}{\glc{KEEP}}{Back stencil depth buffer fail action}{\ref{stencil}}{stencil-buffer}
+\doentry{STENCIL\_BACK\_PASS\_DEPTH\_PASS}{$\Enum$}{\glr{GetIntegerv}}{\glc{KEEP}}{Back stencil depth buffer pass action}{\ref{stencil}}{stencil-buffer}
+
+\doentry{DEPTH\_TEST}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{Depth test enabled}{\ref{zbuffer}}{depth-buffer/enable}
+\doentry{DEPTH\_FUNC}{$\Enum$}{\glr{GetIntegerv}}{\glc{LESS}}{Depth test function}{\ref{zbuffer}}{depth-buffer}
+
+\doentry{BLEND}{$\mdrawbuf* \times B$}{\glr{IsEnabledi}}{\glc{FALSE}}{Blending enabled {for draw buffer $i$}}{\ref{blending}}{color-buffer/enable}
+
+% ARB_blend_func_extended
+\doentry{BLEND\_SRC\_RGB}{$\mdrawbuf* \times \Enum$}{\glr{GetIntegeri\_v}}{\glc{ONE}}{Blending source RGB function for draw buffer $i$}{\ref{blending}}{color-buffer}
+\doentry{BLEND\_SRC\_ALPHA}{$\mdrawbuf* \times \Enum$}{\glr{GetIntegeri\_v}}{\glc{ONE}}{Blending source A function for draw buffer $i$}{\ref{blending}}{color-buffer}
+\doentry{BLEND\_DST\_RGB}{$\mdrawbuf* \times \Enum$}{\glr{GetIntegeri\_v}}{\glc{ZERO}}{Blending dest. RGB function for draw buffer $i$}{\ref{blending}}{color-buffer}
+\doentry{BLEND\_DST\_ALPHA}{$\mdrawbuf* \times \Enum$}{\glr{GetIntegeri\_v}}{\glc{ZERO}}{Blending dest. A function for draw buffer $i$}{\ref{blending}}{color-buffer}
+\doentry{BLEND\_EQUATION\_RGB}{$\mdrawbuf* \times \Enum$}{\glr{GetIntegeri\_v}}{\glc{FUNC\_ADD}}{RGB blending equation for draw buffer $i$}{\ref{blending}}{color-buffer}
+\doentry{BLEND\_EQUATION\_ALPHA}{$\mdrawbuf* \times \Enum$}{\glr{GetIntegeri\_v}}{\glc{FUNC\_ADD}}{Alpha blending equation for draw buffer $i$}{\ref{blending}}{color-buffer}
+
+\doentry{BLEND\_COLOR}{$C$}{\glr{GetFloatv}}{0.0,0.0,0.0,0.0}{Constant blend color}{\ref{blending}}{color-buffer}
+
+\doentry{DITHER}{$B$}{\glr{IsEnabled}}{\glc{TRUE}}{Dithering enabled}{\ref{dither}}{color-buffer/enable}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Framebuffer Control}{statetab:framebuf}                                      % Table 6.20
+\newshortcommentstart
+
+\doentry{COLOR\_WRITEMASK}{$\mdrawbuf* \times 4 \times B$}{\glr{GetBooleani\_v}}{(\glc{TRUE},\glc{TRUE},\glc{TRUE},\glc{TRUE})}{Color write enables (R,G,B,A) for draw buffer $i$}{\ref{writemask}}{color-buffer}
+
+\doentry{DEPTH\_WRITEMASK}{$B$}{\glr{GetBooleanv}}{\glc{TRUE}}{Depth buffer enabled for writing}{\ref{writemask}}{depth-buffer}
+\doentry{STENCIL\_WRITEMASK}{$\Zplus$}{\glr{GetIntegerv}}{1's}{Front stencil buffer writemask}{\ref{writemask}}{stencil-buffer}
+\doentry{STENCIL\_BACK\_WRITEMASK}{$\Zplus$}{\glr{GetIntegerv}}{1's}{Back stencil buffer writemask}{\ref{writemask}}{stencil-buffer}
+
+\doentry{COLOR\_CLEAR\_VALUE}{$C$}{\glr{GetFloatv}}{0.0,0.0,0.0,0.0}{Color buffer clear value}{\ref{clear}}{color-buffer}
+\doentry{DEPTH\_CLEAR\_VALUE}{$R^{+}$}{\glr{GetFloatv}}{1}{Depth buffer clear value}{\ref{clear}}{depth-buffer}
+\doentry{STENCIL\_CLEAR\_VALUE}{$\Zplus$}{\glr{GetIntegerv}}{0}{Stencil clear value}{\ref{clear}}{stencil-buffer}
+
+\doentry{DRAW\_FRAMEBUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Framebuffer object bound to \glc{DRAW\_FRAMEBUFFER}}{\ref{framebuf:fbo:objects}}{--}
+\doentry{READ\_FRAMEBUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Framebuffer object bound to \glc{READ\_FRAMEBUFFER}}{\ref{framebuf:fbo:objects}}{--}
+\doentry{RENDERBUFFER\_BINDING}{$Z$}{\glr{GetIntegerv}}{0}{Renderbuffer object bound to \glc{RENDERBUFFER}}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetabledifferentindexcaption}{Framebuffer (state per framebuffer object)
+    {\par \small \fn1 This state is queried
+    from the currently bound read framebuffer.}}{statetab:fbobjstate}{Framebuffer (state per framebuffer object)}             % Table 6.22
+\newstart
+
+\doentry{DRAW\_BUFFER$i$}{$\mdrawbuf* \times \Enum$}{\glr{GetIntegerv}}{see~\ref{setbuffers}}{Draw buffer selected for color output $i$}{\ref{setbuffers}}{color-buffer}
+\doentry{READ\_BUFFER}{$\Enum$}{\glr{GetIntegerv}}{see~\ref{pix:read:buffer}}{Read source buffer \fn1}{\ref{pix:read:buffer}}{pixel}
+
+\doentry{FRAMEBUFFER\_DEFAULT\_WIDTH}{$\Zplus$}{\glr{GetFramebufferParameteriv}}{0}{Default width of framebuffer w/o attachments}{\ref{framebuf:fbo:objects}}{--}
+\doentry{FRAMEBUFFER\_DEFAULT\_HEIGHT}{$\Zplus$}{\glr{GetFramebufferParameteriv}}{0}{Default height of framebuffer w/o attachments}{\ref{framebuf:fbo:objects}}{--}
+\doentry{FRAMEBUFFER\_DEFAULT\_LAYERS}{$\Zplus$}{\glr{GetFramebuffer\-Parameteriv}}{0}{Default layer count of framebuffer w/o attachments}{\ref{framebuf:fbo:params}}{--}
+\doentry{FRAMEBUFFER\_DEFAULT\_SAMPLES}{$\Zplus$}{\glr{GetFramebufferParameteriv}}{0}{Default sample count of framebuffer w/o attachments}{\ref{framebuf:fbo:objects}}{--}
+\doentry{FRAMEBUFFER\_DEFAULT\_FIXED\_SAMPLE\_LOCATIONS}{$B$}{\glr{GetFramebufferParameteriv}}{\glc{FALSE}}{Default sample location pattern of framebuffer w/o attachments}{\ref{framebuf:fbo:objects}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+\begin{statetable}{Framebuffer (state per attachment point)}{statetab:fbattachstate}            % Table 6.23
+\newshortcommandstart
+%\tabheader{|m{1.4in}||c|m{1.1in}|m{0.5in}|m{1.4in}|c|c|}{Initial}
+
+\doentry{FRAMEBUFFER\_ATTACHMENT\_OBJECT\_TYPE}{$\Enum$}{\glr{GetFramebuffer\-Attachment\-Parameteriv}}{\glc{NONE}}{Type of image attached to framebuffer attachment point}{\ref{framebuf:fbo:images}}{--}
+\doentry{FRAMEBUFFER\_ATTACHMENT\_OBJECT\_NAME}{$Z+$}{\glr{GetFramebuffer\-Attachment\-Parameteriv}}{0}{Name of object attached to framebuffer attachment point}{\ref{framebuf:fbo:images}}{--}
+\doentry{FRAMEBUFFER\_ATTACHMENT\_TEXTURE\_LEVEL}{$Z+$}{\glr{GetFramebuffer\-Attachment\-Parameteriv}}{0}{Mipmap level of texture image attached, if object attached is texture}{\ref{framebuf:fbo:images:textures}}{--}
+\doentry{FRAMEBUFFER\_ATTACHMENT\_TEXTURE\_CUBE\_MAP\_FACE}{$\Zplus$}{\glr{GetFramebuffer\-Attachment\-Parameteriv}}{\glc{NONE}}{Cubemap face of texture image attached, if object attached is cubemap texture}{\ref{framebuf:fbo:images:textures}}{--}
+\doentry{FRAMEBUFFER\_ATTACHMENT\_TEXTURE\_LAYER}{$Z$}{\glr{GetFramebuffer\-Attachment\-Parameteriv}}{0}{Layer of texture image attached, if object attached is 3D texture}{\ref{framebuf:fbo:images:textures}}{--}
+\doentry{FRAMEBUFFER\_ATTACHMENT\_LAYERED}{$B$}{\glr{GetFramebuffer\-Attachment\-Parameteriv}}{\glc{FALSE}}{Framebuffer attachment is layered}{\ref{framebuf:fbo:layered}}{--}
+\doentry{FRAMEBUFFER\_ATTACHMENT\_COLOR\_ENCODING}{$\Enum$}{\glr{GetFramebuffer\-Attachment\-Parameteriv}}{-}{Encoding of components in the attached image}{\ref{gets:fbo}}{--}
+\doentry{FRAMEBUFFER\_ATTACHMENT\_COMPONENT\_TYPE}{$\Enum$}{\glr{GetFramebuffer\-Attachment\-Parameteriv}}{-}{Data type of components in the attached image}{\ref{gets:fbo}}{--}
+\doentry{FRAMEBUFFER\_ATTACHMENT\_$x$\_SIZE}{$\Zplus$}{\glr{GetFramebuffer\-Attachment\-Parameteriv}}{-}{Size in bits of attached image's $x$ component; $x$ is \glc{RED}, \glc{GREEN}, \glc{BLUE}, \glc{ALPHA}, \glc{DEPTH}, or \glc{STENCIL}}{\ref{gets:fbo}}{--}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Renderbuffer (state per renderbuffer object)}{statetab:rendbufobjstate}      % Table 6.25
+\newstart
+
+\doentry{RENDERBUFFER\_WIDTH}{$\Zplus$}{\glr{GetRenderbufferParameteriv}}{0}{Width of renderbuffer}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+\doentry{RENDERBUFFER\_HEIGHT}{$\Zplus$}{\glr{GetRenderbufferParameteriv}}{0}{Height of renderbuffer}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+\doentry{RENDERBUFFER\_INTERNAL\_FORMAT}{$\Enum$}{\glr{GetRenderbufferParameteriv}}{\glc{RGBA4}}{Internal format of renderbuffer}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+\doentry{RENDERBUFFER\_RED\_SIZE}{$\Zplus$}{\glr{GetRenderbufferParameteriv}}{0}{Size in bits of renderbuffer image's red component}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+\doentry{RENDERBUFFER\_GREEN\_SIZE}{$\Zplus$}{\glr{GetRenderbufferParameteriv}}{0}{Size in bits of renderbuffer image's green component}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+\doentry{RENDERBUFFER\_BLUE\_SIZE}{$\Zplus$}{\glr{GetRenderbufferParameteriv}}{0}{Size in bits of renderbuffer image's blue component}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+\doentry{RENDERBUFFER\_ALPHA\_SIZE}{$\Zplus$}{\glr{GetRenderbufferParameteriv}}{0}{Size in bits of renderbuffer image's alpha component}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+\doentry{RENDERBUFFER\_DEPTH\_SIZE}{$\Zplus$}{\glr{GetRenderbufferParameteriv}}{0}{Size in bits of renderbuffer image's depth component}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+\doentry{RENDERBUFFER\_STENCIL\_SIZE}{$\Zplus$}{\glr{GetRenderbufferParameteriv}}{0}{Size in bits of renderbuffer image's stencil component}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+\doentry{RENDERBUFFER\_SAMPLES}{$\Zplus$}{\glr{GetRenderbufferParameteriv}}{0}{No. of samples}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Pixels}{statetab:pixels}                                                     % Table 6.26
+\newstart
+
+\doentry{UNPACK\_IMAGE\_HEIGHT}{$\Zplus$}{\glr{GetIntegerv}}{0}{Value of \glc{UNPACK\_IMAGE\_HEIGHT}}{\ref{pix:storemode}}{pixel-store}
+\doentry{UNPACK\_SKIP\_IMAGES}{$\Zplus$}{\glr{GetIntegerv}}{0}{Value of \glc{UNPACK\_SKIP\_IMAGES}}{\ref{pix:storemode}}{pixel-store}
+\doentry{UNPACK\_ROW\_LENGTH}{$\Zplus$}{\glr{GetIntegerv}}{0}{Value of \glc{UNPACK\_ROW\_LENGTH}}{\ref{pix:storemode}}{pixel-store}
+\doentry{UNPACK\_SKIP\_ROWS}{$\Zplus$}{\glr{GetIntegerv}}{0}{Value of \glc{UNPACK\_SKIP\_ROWS}}{\ref{pix:storemode}}{pixel-store}
+\doentry{UNPACK\_SKIP\_PIXELS}{$\Zplus$}{\glr{GetIntegerv}}{0}{Value of \glc{UNPACK\_SKIP\_PIXELS}}{\ref{pix:storemode}}{pixel-store}
+\doentry{UNPACK\_ALIGNMENT}{$\Zplus$}{\glr{GetIntegerv}}{4}{Value of \glc{UNPACK\_ALIGNMENT}}{\ref{pix:storemode}}{pixel-store}
+\doentry{PACK\_ROW\_LENGTH}{$\Zplus$}{\glr{GetIntegerv}}{0}{Value of \glc{PACK\_ROW\_LENGTH}}{\ref{pix:read}}{pixel-store}
+\doentry{PACK\_SKIP\_ROWS}{$\Zplus$}{\glr{GetIntegerv}}{0}{Value of \glc{PACK\_SKIP\_ROWS}}{\ref{pix:read}}{pixel-store}
+\doentry{PACK\_SKIP\_PIXELS}{$\Zplus$}{\glr{GetIntegerv}}{0}{Value of \glc{PACK\_SKIP\_PIXELS}}{\ref{pix:read}}{pixel-store}
+\doentry{PACK\_ALIGNMENT}{$\Zplus$}{\glr{GetIntegerv}}{4}{Value of \glc{PACK\_ALIGNMENT}}{\ref{pix:read}}{pixel-store}
+
+\doentry{PIXEL\_PACK\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Pixel pack buffer binding}{\ref{pix:read}}{pixel-store}
+\doentry{PIXEL\_UNPACK\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Pixel unpack buffer binding}{\ref{state:bufobjquery}}{pixel-store}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Shader Object State}{statetab:shaderobj}                                     % Table 6.27
+\newstart
+
+\doentry{SHADER\_TYPE}{$\Enum$}{\glr{GetShaderiv}}{--}{Type of shader (see table~\ref{tab:programs:shadertypes})}{\ref{vertshad:shader}}{--}
+\doentry{DELETE\_STATUS}{$B$}{\glr{GetShaderiv}}{\glc{FALSE}}{Shader flagged for deletion}{\ref{vertshad:shader}}{--}
+\doentry{COMPILE\_STATUS}{$B$}{\glr{GetShaderiv}}{\glc{FALSE}}{Last compile succeeded}{\ref{vertshad:shader}}{--}
+\doentry{--}{$S$}{\glr{GetShaderInfoLog}}{empty string}{Info log for shader objects}{\ref{gets:shader}}{--}
+\doentry{INFO\_LOG\_LENGTH}{$\Zplus$}{\glr{GetShaderiv}}{0}{Length of info log}{\ref{gets:shader}}{--}
+\doentry{--}{$S$}{\glr{GetShaderSource}}{empty string}{Source code for a shader}{\ref{vertshad:shader}}{--}
+\doentry{SHADER\_SOURCE\_LENGTH}{$\Zplus$}{\glr{GetShaderiv}}{0}{Length of source code}{\ref{gets:shader}}{--}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Pipeline Object State}{statetab:progpipeobj}                         % Table 6.29 (dep: 6.42)
+\newfixstart
+
+\doentry{ACTIVE\_PROGRAM}{$\Zplus$}{\glr{GetProgramPipelineiv}}{0}{The program object that \func{Uniform*} commands update when PPO bound}{\ref{vertshad:progpipeobjects}}{--}
+\doentry{VERTEX\_SHADER}{$\Zplus$}{\glr{GetProgramPipelineiv}}{0}{Name of current vertex shader program object}{\ref{vertshad:progpipeobjects}}{--}
+\doentry{GEOMETRY\_SHADER}{$\Zplus$}{\glr{GetProgramPipelineiv}}{0}{Name of current geometry shader program object}{\ref{vertshad:progpipeobjects}}{--}
+\doentry{TESS\_CONTROL\_SHADER}{$\Zplus$}{\glr{GetProgramPipelineiv}}{0}{Name of current TCS program object}{\ref{vertshad:progpipeobjects}}{--}
+\doentry{TESS\_EVALUATION\_SHADER}{$\Zplus$}{\glr{GetProgramPipelineiv}}{0}{Name of current TES program object}{\ref{vertshad:progpipeobjects}}{--}
+\doentry{FRAGMENT\_SHADER}{$\Zplus$}{\glr{GetProgramPipelineiv}}{0}{Name of current fragment shader program object}{\ref{vertshad:progpipeobjects}}{--}
+\doentry{COMPUTE\_SHADER}{$\Zplus$}{\glr{GetProgramPipelineiv}}{0}{Name of current compute shader program object}{\ref{vertshad:progpipeobjects}}{--}
+\doentry{VALIDATE\_STATUS}{$B$}{\glr{GetProgramPipelineiv}}{\glc{FALSE}}{Validate status of program pipeline object}{\ref{vertshad:progpipeobjects}}{--}
+\doentry{-}{$S$}{\glr{GetProgramPipelineInfoLog}}{empty}{Info log for program pipeline object}{\ref{gets:shader}}{--}
+\doentry{INFO\_LOG\_LENGTH}{$\Zplus$}{\glr{GetProgramPipelineiv}}{0}{Length of info log}{\ref{gets:shader}}{--}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Object State}{statetab:progobj}                                      % Table 6.28
+\newfixstart
+
+\doentry{CURRENT\_PROGRAM}{$\Zplus$}{\glr{GetIntegerv}}{0}{Name of current program object}{\ref{vertshad:program}}{--}
+
+\doentry{PROGRAM\_PIPELINE\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Current program pipeline object binding}{\ref{vertshad:progpipeobjects}}{--}
+\doentry{PROGRAM\_SEPARABLE}{$B$}{\glr{GetProgramiv}}{\glc{FALSE}}{Program object can be bound for separate pipeline stages}{\ref{vertshad:progpipeobjects}}{--}
+
+\doentry{DELETE\_STATUS}{$B$}{\glr{GetProgramiv}}{\glc{FALSE}}{Program object deleted}{\ref{vertshad:program}}{--}
+\doentry{LINK\_STATUS}{$B$}{\glr{GetProgramiv}}{\glc{FALSE}}{Last link attempt succeeded}{\ref{vertshad:program}}{--}
+\doentry{VALIDATE\_STATUS}{$B$}{\glr{GetProgramiv}}{\glc{FALSE}}{Last validate attempt succeeded}{\ref{vertshad:program}}{--}
+\doentry{ATTACHED\_SHADERS}{$\Zplus$}{\glr{GetProgramiv}}{0}{No. of attached shader objects}{\ref{gets:shader}}{--}
+\doentry{--}{$0* \times \Zplus$}{\glr{GetAttachedShaders}}{empty}{Shader objects attached}{\ref{gets:shader}}{--}
+\doentry{--}{$S$}{\glr{GetProgramInfoLog}}{empty}{Info log for program object}{\ref{gets:shader}}{--}
+\doentry{INFO\_LOG\_LENGTH}{$\Zplus$}{\glr{GetProgramiv}}{0}{Length of info log}{\ref{vertshad:vars:uniform}}{--}
+
+\doentry{PROGRAM\_BINARY\_LENGTH}{$\Zplus$}{\glr{GetProgramiv}}{0}{Length of program binary}{\ref{vertshad:progbinaries}}{--}
+\doentry{PROGRAM\_BINARY\_RETRIEVABLE\_HINT}{$B$}{\glr{GetProgramiv}}{\glc{FALSE}}{Retrievable binary hint enabled}{\ref{vertshad:progbinaries}}{--}
+\doentry{--}{$0* \times BMU$}{\glr{GetProgramBinary}}{--}{Binary representation of program}{\ref{vertshad:progbinaries}}{--}
+
+\doentry{COMPUTE\_WORK\_GROUP\_SIZE}{$3 \times \Zplus$}{\glr{GetProgramiv}}{\{0, \dots \}}{Local work size of a linked compute program}{\ref{computeshad}}{--}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Object State (cont.)}{statetab:progobj0}                             % Table 6.29 (dep: 6.42)
+\newfixstart
+
+\doentry{ACTIVE\_UNIFORMS}{$\Zplus$}{\glr{GetProgramiv}}{0}{No. of active uniforms}{\ref{vertshad:vars:uniform}}{--}
+\doentry{--}{$0* \times Z$}{\glr{GetUniformLocation}}{--}{Location of active uniforms}{\ref{gets:shader}}{--}
+\doentry{--}{$0* \times \Zplus$}{\glr{GetActiveUniform}}{--}{Size of active uniform}{\ref{vertshad:vars:uniform}}{--}
+\doentry{--}{$0* \times \Zplus$}{\glr{GetActiveUniform}}{--}{Type of active uniform}{\ref{vertshad:vars:uniform}}{--}
+\doentry{--}{$0* \times \glt{char}$}{\glr{GetActiveUniform}}{empty}{Name of active uniform}{\ref{vertshad:vars:uniform}}{--}
+\doentry{ACTIVE\_UNIFORM\_MAX\_LENGTH}{$\Zplus$}{\glr{GetProgramiv}}{0}{Max. active uniform name length}{\ref{gets:shader}}{--}
+\doentry{--}{$-$}{\glr{GetUniform}}{0}{Uniform value}{\ref{vertshad:vars:uniform}}{--}
+\doentry{ACTIVE\_ATTRIBUTES}{$\Zplus$}{\glr{GetProgramiv}}{0}{No. of active attributes}{\ref{vertshad:vars:attrib}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Object State (cont.)}{statetab:progobj1}                             % Table 6.29
+%\newshortvaluestart
+\tabheader{|m{1.4in}||c|m{1.1in}|m{1.2in}|m{1.5in}|c|c|}{Initial}
+%\newfixstart
+
+\doentry{--}{$0* \times Z$}{\glr{GetAttribLocation}}{--}{Location of active generic attribute}{\ref{vertshad:vars:attrib}}{--}
+\doentry{--}{$0* \times \Zplus$}{\glr{GetActiveAttrib}}{--}{Size of active attribute}{\ref{vertshad:vars:attrib}}{--}
+\doentry{--}{$0* \times \Zplus$}{\glr{GetActiveAttrib}}{--}{Type of active attribute}{\ref{vertshad:vars:attrib}}{--}
+\doentry{--}{$0* \times \glt{char}$}{\glr{GetActiveAttrib}}{empty}{Name of active attribute}{\ref{vertshad:vars:attrib}}{--}
+\doentry{ACTIVE\_ATTRIBUTE\_MAX\_LENGTH}{$\Zplus$}{\glr{GetProgramiv}}{0}{Max. active attribute name length}{\ref{gets:shader}}{--}
+
+\doentry{GEOMETRY\_VERTICES\_OUT}{$\Zplus$}{\glr{GetProgramiv}}{0}{Max. no. of output vertices}{\ref{geomshad:exec}}{--}
+\doentry{GEOMETRY\_INPUT\_TYPE}{$\Enum$}{\glr{GetProgramiv}}{\glc{TRIANGLES}}{Primitive input type}{\ref{geomshad:input}}{--}
+\doentry{GEOMETRY\_OUTPUT\_TYPE}{$\Enum$}{\glr{GetProgramiv}}{\glc{TRIANGLE\_STRIP}}{Primitive output type}{\ref{geomshad:output}}{--}
+\doentry{GEOMETRY\_SHADER\_INVOCATIONS}{$\Zplus$}{\glr{GetProgramiv}}{1}{No. of times a geom. shader should be executed for each input primitive}{\ref{geomshad:exec:instanced}}{--}
+
+\doentry{TRANSFORM\_FEEDBACK\_BUFFER\_MODE}{$\Enum$}{\glr{GetProgramiv}}{\glc{INTERLEAVED\_ATTRIBS}}{Transform feedback mode for the program}{\ref{gets:shader}}{--}
+\doentry{TRANSFORM\_FEEDBACK\_VARYINGS}{$\Zplus$}{\glr{GetProgramiv}}{0}{No. of outputs to stream to buffer object(s)}{\ref{gets:shader}}{--}
+\doentry{TRANSFORM\_FEEDBACK\_VARYING\_MAX\_LENGTH}{$\Zplus$}{\glr{GetProgramiv}}{0}{Max. transform feedback output variable name length}{\ref{gets:shader}}{--}
+\doentry{--}{$\Zplus$}{\glr{GetTransform\-FeedbackVarying}}{--}{Size of each transform feedback output variable}{\ref{vertshad:vars:varying}}{--}
+\doentry{--}{$\Zplus$}{\glr{GetTransform\-FeedbackVarying}}{--}{Type of each transform feedback output variable}{\ref{vertshad:vars:varying}}{--}
+\doentry{--}{$0^{+} \times \glt{char}$}{\glr{GetTransform\-FeedbackVarying}}{--}{Name of each transform feedback output variable}{\ref{vertshad:vars:varying}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Object State (cont.)}{statetab:progobj2}                             % Table 6.30
+\newfixshortvaluestart
+
+\doentry{ACTIVE\_UNIFORM\_BLOCKS}{$\Zplus$}{\glr{GetProgramiv}}{0}{No. of active uniform blocks in a program}{\ref{vertshad:vars:ubo}}{--}
+\doentry{ACTIVE\_UNIFORM\_BLOCK\_MAX\_NAME\_LENGTH}{$\Zplus$}{\glr{GetProgramiv}}{0}{Length of longest active uniform block name}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_TYPE}{$0* \times \Enum$}{\glr{GetActiveUniformsiv}}{--}{Type of active uniform}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_SIZE}{$0* \times \Zplus$}{\glr{GetActiveUniformsiv}}{--}{Size of active uniform}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_NAME\_LENGTH}{$0* \times \Zplus$}{\glr{GetActiveUniformsiv}}{--}{Uniform name length}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BLOCK\_INDEX}{$0* \times Z$}{\glr{GetActiveUniformsiv}}{--}{Uniform block index}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_OFFSET}{$0* \times Z$}{\glr{GetActiveUniformsiv}}{--}{Uniform buffer offset}{\ref{vertshad:vars:ubo}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Object State (cont.)}{statetab:progobj3}                             % Table 6.31
+\newfixshortvaluestart
+
+\doentry{UNIFORM\_ARRAY\_STRIDE}{$0* \times Z$}{\glr{GetActiveUniformsiv}}{--}{Uniform buffer array stride}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_MATRIX\_STRIDE}{$0* \times Z$}{\glr{GetActiveUniformsiv}}{--}{Uniform buffer intra-matrix stride}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_IS\_ROW\_MAJOR}{$0* \times B$}{\glr{GetActiveUniformsiv}}{--}{Whether uniform is a row-major matrix}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BLOCK\_BINDING}{$\Zplus$}{\glr{GetActive\-UniformBlockiv}}{0}{Uniform buffer binding points associated with the specified uniform block}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BLOCK\_DATA\_SIZE}{$\Zplus$}{\glr{GetActive\-UniformBlockiv}}{--}{Size of the storage needed to hold this uniform block's data}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BLOCK\_NAME\_LENGTH}{$\Zplus$}{\glr{GetActive\-UniformBlockiv}}{--}{Uniform block name length}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BLOCK\_ACTIVE\_UNIFORMS}{$\Zplus$}{\glr{GetActive\-UniformBlockiv}}{--}{Count of active uniforms in the specified uniform block}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BLOCK\_ACTIVE\_UNIFORM\_INDICES}{$n \times \Zplus$}{\glr{GetActive\-UniformBlockiv}}{--}{Array of active uniform indices of the specified uniform block}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BLOCK\_REFERENCED\_BY\_VERTEX\_SHADER}{$B$}{\glr{GetActive\-UniformBlockiv}}{0}{True if uniform block is actively referenced by the vertex stage}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BLOCK\_REFERENCED\_BY\_FRAGMENT\_SHADER}{$B$}{\glr{GetActive\-UniformBlockiv}}{0}{True if uniform block is actively referenced by the fragment stage}{\ref{vertshad:vars:ubo}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Object State (cont.)}{statetab:progobjatomic}                        % Table 6.33 (dep: 6.46)
+\newfixshortvaluestart
+
+\doentry{TESS\_CONTROL\_OUTPUT\_VERTICES}{$\Zplus$}{\glr{GetProgramiv}}{0}{Output patch size for tess. control shader}{\ref{tess:controlshad}}{--}
+\doentry{TESS\_GEN\_MODE}{$\Enum$}{\glr{GetProgramiv}}{\glc{QUADS}}{Base primitive type for tess. prim. generator}{\ref{tess:primgen}}{--}
+\doentry{TESS\_GEN\_SPACING}{$\Enum$}{\glr{GetProgramiv}}{\glc{EQUAL}}{Spacing of tess. prim. generator edge subdivision}{\ref{tess:primgen}}{--}
+\doentry{TESS\_GEN\_VERTEX\_ORDER}{$\Enum$}{\glr{GetProgramiv}}{\glc{CCW}}{Order of vertices in primitives generated by tess. primitive generator}{\ref{tess:primgen}}{--}
+\doentry{TESS\_GEN\_POINT\_MODE}{$B$}{\glr{GetProgramiv}}{\glc{FALSE}}{Tess. prim. generator emits points?}{\ref{tess:primgen}}{--}
+
+\doentry{ACTIVE\_ATOMIC\_COUNTER\_BUFFERS}{$\Zplus$}{\glr{GetProgramiv}}{0}{No. of active atomic counter buffers (AACBs) used by a program}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Interface State}{statetab:proginterface}                             % Table 6.33 (dep: 6.46)
+\newfixshortvaluestart
+
+\doentry{ACTIVE\_RESOURCES}{$n \times \Zplus$}{\glr{GetProgram\-Interfaceiv}}{0}{No. of active resources on an interface}{\ref{vertshad:program:interfaces}}{--}
+\doentry{MAX\_NAME\_LENGTH}{$n \times \Zplus$}{\glr{GetProgram\-Interfaceiv}}{0}{Max. name length for active resources}{\ref{vertshad:program:interfaces}}{--}
+\doentry{MAX\_NUM\_ACTIVE\_VARIABLES}{$n \times \Zplus$}{\glr{GetProgram\-Interfaceiv}}{0}{Max. no. of active variables for active resources}{\ref{vertshad:program:interfaces}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Object Resource State}{statetab:progobjresource}                     % Table 6.33 (dep: 6.46)
+\newfixshortvaluestart
+
+\doentry{ACTIVE\_VARIABLES}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{List of active variables owned by active resource}{\ref{vertshad:program:interfaces}}{--}
+\doentry{ARRAY\_SIZE}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource array size}{\ref{vertshad:program:interfaces}}{--}
+\doentry{ARRAY\_STRIDE}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource array stride in memory}{\ref{vertshad:program:interfaces}}{--}
+\doentry{ATOMIC\_COUNTER\_BUFFER\_INDEX}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Index of atomic counter buffer owning resource}{\ref{vertshad:program:interfaces}}{--}
+\doentry{BLOCK\_INDEX}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Index of interface block owning resource}{\ref{vertshad:program:interfaces}}{--}
+\doentry{BUFFER\_BINDING}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Buffer binding assigned to active resource}{\ref{vertshad:program:interfaces}}{--}
+\doentry{BUFFER\_DATA\_SIZE}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Min. buffer data size required for resource}{\ref{vertshad:program:interfaces}}{--}
+\doentry{IS\_ROW\_MAJOR}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource stored as a row major matrix?}{\ref{vertshad:program:interfaces}}{--}
+\doentry{LOCATION}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Location assigned to active resource}{\ref{vertshad:program:interfaces}}{--}
+\doentry{MATRIX\_STRIDE}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource matrix stride in memory}{\ref{vertshad:program:interfaces}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Program Object Resource State (cont.)}{statetab:progobjresource2}            % Table 6.33 (dep: 6.46)
+\newfixshortvaluestart
+
+\doentry{NAME\_LENGTH}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Length of active resource name}{\ref{vertshad:program:interfaces}}{--}
+\doentry{NUM\_ACTIVE\_VARIABLES}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{No. of active variables owned by active resource}{\ref{vertshad:program:interfaces}}{--}
+\doentry{OFFSET}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource offset in memory}{\ref{vertshad:program:interfaces}}{--}
+\doentry{REFERENCED\_BY\_VERTEX\_SHADER}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource used by vertex shader?}{\ref{vertshad:program:interfaces}}{--}
+\doentry{REFERENCED\_BY\_TESS\_CONTROL\_SHADER}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource used by tess. control shader?}{\ref{vertshad:program:interfaces}}{--}
+\doentry{REFERENCED\_BY\_TESS\_EVALUATION\_SHADER}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource used by tess. evaluation shader?}{\ref{vertshad:program:interfaces}}{--}
+\doentry{REFERENCED\_BY\_GEOMETRY\_SHADER}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource used by geometry shader?}{\ref{vertshad:program:interfaces}}{--}
+\doentry{REFERENCED\_BY\_FRAGMENT\_SHADER}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource used by fragment shader?}{\ref{vertshad:program:interfaces}}{--}
+\doentry{REFERENCED\_BY\_COMPUTE\_SHADER}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource used by compute shader?}{\ref{vertshad:program:interfaces}}{--}
+\doentry{TOP\_LEVEL\_ARRAY\_SIZE}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Array size of top level shd. storage block member}{\ref{vertshad:program:interfaces}}{--}
+\doentry{TOP\_LEVEL\_ARRAY\_STRIDE}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Array stride of top level shd. storage block member}{\ref{vertshad:program:interfaces}}{--}
+\doentry{TYPE}{$\Zplus$}{\glr{GetProgram\-Resourceiv}}{-}{Active resource data type}{\ref{vertshad:program:interfaces}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Vertex Shader State (not part of program objects)}{statetab:vertshad}        % Table 6.32
+\newstart
+
+\doentry{CURRENT\_VERTEX\_ATTRIB}{$\mvtxattr* \times R^4$}{\glr{GetVertexAttribfv}}{0.0,0.0,0.0,1.0}{Current generic vertex attribute values}{\ref{vert:spec}}{current}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}{Query Object State}{statetab:query}                                          % Table 6.33
+\newstart
+
+  % gitlab #6
+\doentry{QUERY\_RESULT}{$\Zplus$}{\glr{GetQueryObjectuiv}}{0 or \glc{FALSE}}{Query object result}{\ref{state:occquery}}{--}
+\doentry{QUERY\_RESULT\_AVAILABLE}{$B$}{\glr{GetQueryObjectuiv}}{\ochange \glc{TRUE}}{Is the query object result available?}{\ref{state:occquery}}{--}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Atomic Counter Buffer Binding State}{statetab:atomic}                        % Table 6.36 (dep: 6.49)
+\tabheader{|l||c|l|c|m{1.5in}|c|c|}{Initial}
+
+\doentry{ATOMIC\_COUNTER\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Current value of generic atomic counter buffer buffer}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{ATOMIC\_COUNTER\_BUFFER\_BINDING}{$n \times \Zplus$}{\glr{GetIntegeri\_v}}{0}{Buffer object bound to each atomic counter buffer binding point}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{ATOMIC\_COUNTER\_BUFFER\_START}{$n \times \Zplus$}{\glr{GetInteger64i\_v}}{0}{Start offset of binding range for each atomic counter buffer}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{ATOMIC\_COUNTER\_BUFFER\_SIZE}{$n \times \Zplus$}{\glr{GetInteger64i\_v}}{0}{Size of binding range for each atomic counter buffer}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Image State (state per image unit)}{statetab:imunit}                         % Table 6.36??? (dep: 6.49???)
+\newstart
+
+\doentry{IMAGE\_BINDING\_NAME}{$8* \times \Zplus$}{\glr{GetIntegeri\_v}}{0}{Name of bound texture object}{\ref{tex:loadstore}}{--}
+\doentry{IMAGE\_BINDING\_LEVEL}{$8* \times \Zplus$}{\glr{GetIntegeri\_v}}{0}{Level of bound texture object}{\ref{tex:loadstore}}{--}
+\doentry{IMAGE\_BINDING\_LAYERED}{$8* \times B$}{\glr{GetBooleani\_v}}{\glc{FALSE}}{Texture object bound with multiple layers}{\ref{tex:loadstore}}{--}
+\doentry{IMAGE\_BINDING\_LAYER}{$8* \times \Zplus$}{\glr{GetIntegeri\_v}}{0}{Layer of bound texture, if not layered}{\ref{tex:loadstore}}{--}
+\doentry{IMAGE\_BINDING\_ACCESS}{$8* \times \Enum$}{\glr{GetIntegeri\_v}}{\glc{READ\_ONLY}}{Read and/or write access for bound texture}{\ref{tex:loadstore}}{--}
+\doentry{IMAGE\_BINDING\_FORMAT}{$8* \times \Zplus$}{\glr{GetIntegeri\_v}}{\glc{R32UI}}{Format used for accesses to bound texture}{\ref{tex:loadstore}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Shader Storage Buffer Binding State}{statetab:storage}                       % Table 6.36 (dep: 6.49)
+\tabheader{|l||c|l|c|m{1.5in}|c|c|}{Initial}
+
+\doentry{SHADER\_STORAGE\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Current value of generic shader storage buffer binding}{\ref{shader:bufvars}}{--}
+\doentry{SHADER\_STORAGE\_BUFFER\_BINDING}{$n \times \Zplus$}{\glr{GetIntegeri\_v}}{0}{Buffer object bound to each shader storage buffer binding point}{\ref{shader:bufvars}}{--}
+\doentry{SHADER\_STORAGE\_BUFFER\_START}{$n \times \Zplus$}{\glr{GetInteger64i\_v}}{0}{Start offset of binding range for each shader storage buffer}{\ref{shader:bufvars}}{--}
+\doentry{SHADER\_STORAGE\_BUFFER\_SIZE}{$n \times \Zplus$}{\glr{GetInteger64i\_v}}{0}{Size of binding range for each shader storage buffer}{\ref{shader:bufvars}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Transform Feedback State}{statetab:xformfeedback}                            % Table 6.34
+\tabheader{|l||c|l|c|m{1.5in}|c|c|}{Initial}
+
+\doentry{TRANSFORM\_FEEDBACK\_BUFFER\_BINDING}{$n \times \Zplus$}{\glr{GetIntegeri\_v}}{0}{Buffer object bound to each transform feedback attribute stream}{\ref{state:bufobjquery}}{--}
+\doentry{TRANSFORM\_FEEDBACK\_BUFFER\_START}{$n \times \Zplus$}{\glr{GetInteger64i\_v}}{0}{Start offset of binding range for each transform feedback attrib. stream}{\ref{state:bufobjquery}}{--}
+\doentry{TRANSFORM\_FEEDBACK\_BUFFER\_SIZE}{$n \times \Zplus$}{\glr{GetInteger64i\_v}}{0}{Size of binding range for each transform feedback attrib. stream}{\ref{state:bufobjquery}}{--}
+\doentry{TRANSFORM\_FEEDBACK\_PAUSED}{$B$}{\glr{GetBooleanv}}{\glc{FALSE}}{Is transform feedback paused on this object?}{\ref{state:bufobjquery}}{--}
+\doentry{TRANSFORM\_FEEDBACK\_ACTIVE}{$B$}{\glr{GetBooleanv}}{\glc{FALSE}}{Is transform feedback active on this object?}{\ref{state:bufobjquery}}{--}
+
+\doentry{-}{$S$}{\glr{GetObjectLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+
+\begin{statetable}{Uniform Buffer Binding State}{statetab:ubo:binding}                          % Table 6.34
+\newfixshortvaluestart
+
+\doentry{UNIFORM\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Uniform buffer object bound to the context for buffer object manipulation}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BUFFER\_BINDING}{$n \times \Zplus$}{\glr{GetIntegeri\_v}}{0}{Uniform buffer object bound to the specified context binding point}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BUFFER\_START}{$n \times \Zplus$}{\glr{GetInteger64i\_v}}{0}{Start of bound uniform buffer region}{\ref{state:bufobjquery}}{--}
+\doentry{UNIFORM\_BUFFER\_SIZE}{$n \times \Zplus$}{\glr{GetInteger64i\_v}}{0}{Size of bound uniform buffer region}{\ref{state:bufobjquery}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+
+\begin{statetable}{Sync (state per sync object)}{statetab:sync}                                 % Table 6.35
+%\tabheader{|l||c|l|c|m{1.5in}|c|c|}{Initial}
+\newstart
+
+\doentry{OBJECT\_TYPE}{$\Enum$}{\glr{GetSynciv}}{\glc{SYNC\_FENCE}}{Type of sync object}{\ref{sync}}{--}
+\doentry{SYNC\_STATUS}{$\Enum$}{\glr{GetSynciv}}{\glc{UNSIGNALED}}{Sync object status}{\ref{sync}}{--}
+\doentry{SYNC\_CONDITION}{$\Enum$}{\glr{GetSynciv}}{\glc{SYNC\_GPU\_COMMANDS\_COMPLETE}}{Sync object condition}{\ref{sync}}{--}
+\doentry{SYNC\_FLAGS}{$Z$}{\glr{GetSynciv}}{0}{Sync object flags}{\ref{sync}}{--}
+
+\doentry{-}{$S$}{\glr{GetObjectPtrLabel}}{empty}{Debug label}{\ref{debug:query}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Hints}{statetab:hints}                                                       % Table 6.36
+\newstart
+
+\doentry{GENERATE\_MIPMAP\_HINT}{$\Enum$}{\glr{GetIntegerv}}{\glc{DONT\_CARE}}{Mipmap generation hint}{\ref{hints}}{hint}
+\doentry{FRAGMENT\_SHADER\_DERIVATIVE\_HINT}{$\Enum$}{\glr{GetIntegerv}}{\glc{DONT\_CARE}}{Fragment shader derivative accuracy hint}{\ref{hints}}{hint}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Compute Dispatch State}{statetab:compute}                                    % Table 6.?? (dep: 6.??)
+\newstart
+
+\doentry{DISPATCH\_INDIRECT\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Indirect dispatch buffer binding}{\ref{computeshad}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetabledifferentindexcaption}
+    {Implementation Dependent Values
+    {\par \small \fn1 These limits are tied to the values of
+    \glc{MAX\_TEXTURE\_SIZE} (for width/height) and \glc{MAX\_SAMPLES} (for
+    samples) respectively.}}{statetab:impl}{Implementation Dependent Values}                    % Table 6.37
+\newlimitstart
+
+\doentry{SUBPIXEL\_BITS}{$\Zplus$}{\glr{GetIntegerv}}{4}{No. of bits of subpixel precision in screen $x_w$ and $y_w$}{\ref{rasterization}}{--}
+
+\doentry{MAX\_ELEMENT\_INDEX}{$\Zplus$}{\glr{GetInteger64v}}{$2^{24}-1$}{Max. element index}{\ref{vert:array:draw}}{--}
+
+\doentry{MAX\_3D\_TEXTURE\_SIZE}{$\Zplus$}{\glr{GetIntegerv}}{256}{Max. 3D texture image dimension}{\ref{tex:spec}}{--}
+\doentry{MAX\_TEXTURE\_SIZE}{$\Zplus$}{\glr{GetIntegerv}}{2048}{Max. 2D texture image dimension}{\ref{tex:spec}}{--}
+
+\doentry{MAX\_ARRAY\_TEXTURE\_LAYERS}{$\Zplus$}{\glr{GetIntegerv}}{256}{Max. no. of layers for texture arrays}{\ref{tex:spec}}{--}
+
+\doentry{MAX\_TEXTURE\_LOD\_BIAS}{$R^{+}$}{\glr{GetFloatv}}{2.0}{Max. absolute texture level of detail bias}{\ref{tex:minf}}{--}
+
+\doentry{MAX\_CUBE\_MAP\_TEXTURE\_SIZE}{$\Zplus$}{\glr{GetIntegerv}}{2048}{Max. cube map texture image dimension}{\ref{tex:spec}}{--}
+
+\doentry{MAX\_RENDERBUFFER\_SIZE}{$\Zplus$}{\glr{GetIntegerv}}{2048}{Max. width and height of renderbuffers}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+
+\doentry{ALIASED\_POINT\_SIZE\_RANGE}{$2 \times R^{+}$}{\glr{GetFloatv}}{1,1}{Range (lo to hi) of point sizes}{\ref{points}}{--}
+\doentry{ALIASED\_LINE\_WIDTH\_RANGE}{$2 \times R^{+}$}{\glr{GetFloatv}}{1,1}{Range (lo to hi) of line widths}{\ref{lines}}{--}
+\doentry{MULTISAMPLE\_LINE\_WIDTH\_RANGE}{$2 \times R^{+}$}{\glr{GetFloatv}}{1,1}{Range (lo to hi) of multisampled line widths}{\ref{line:multisamp}}{--}
+\doentry{MULTISAMPLE\_LINE\_WIDTH\_GRANULARITY}{$R^{+}$}{\glr{GetFloatv}}{--}{Multisampled line width granularity}{\ref{line:multisamp}}{--}
+
+\doentry{MAX\_DRAW\_BUFFERS}{$\Zplus$}{\glr{GetIntegerv}}{$\mdrawbuf$}{Max. no. of active draw buffers}{\ref{setbuffers}}{--}
+
+\doentry{MAX\_FRAMEBUFFER\_WIDTH}{$\Zplus$}{\glr{GetIntegerv}}{2048 \fn1}{Max. width for framebuffer object}{\ref{framebuf:fbo:objects}}{--}
+\doentry{MAX\_FRAMEBUFFER\_HEIGHT}{$\Zplus$}{\glr{GetIntegerv}}{2048 \fn1}{Max. height for framebuffer object}{\ref{framebuf:fbo:objects}}{--}
+\doentry{MAX\_FRAMEBUFFER\_LAYERS}{$\Zplus$}{\glr{GetIntegerv}}{256}{Max. layer count for layered framebuffer object}{\ref{framebuf:fbo:params}}{--}
+\doentry{MAX\_FRAMEBUFFER\_SAMPLES}{$\Zplus$}{\glr{GetIntegerv}}{4 \fn1}{Max. sample count for framebuffer object}{\ref{framebuf:fbo:objects}}{--}
+
+\doentry{MAX\_COLOR\_ATTACHMENTS}{$\Zplus$}{\glr{GetIntegerv}}{4}{Max. no. of FBO attachment points for color buffers}{\ref{framebuf:fbo:images:attaching}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetable}{Implementation Dependent Values (cont.)
+    \ochange
+    \par \small \fn1 These queries return the maximum no. of samples for all
+        internal formats required to support multisampled rendering.
+    \change
+    \par \small \fnb ``ULP'' means ``Units in the Last Place'' or
+        ``Unit of Least Precision''.
+    }{statetab:impl2}                     % Table 6.39
+\newshortlimitstart
+
+\doentry{MIN\_FRAGMENT\_INTERPOLATION\_OFFSET}{$R$}{\glr{GetFloatv}}{-0.5}{Furthest negative offset for \glv{interpolate\-AtOffset}}{\ref{fragshad:vars}}{--}
+\doentry{MAX\_FRAGMENT\_INTERPOLATION\_OFFSET}{$R$}{\glr{GetFloatv}}{+0.5 \change\cbext{gitlab \#149} - 1 ULP\fnb}{Furthest positive offset for \glv{interpolate\-AtOffset}}{\ref{fragshad:vars}}{--}
+\doentry{FRAGMENT\_INTERPOLATION\_OFFSET\_BITS}{$\Zplus$}{\glr{GetIntegerv}}{4}{Subpixel bits for \glv{interpolate\-AtOffset}}{\ref{fragshad:vars}}{--}
+
+\doentry{MAX\_VIEWPORT\_DIMS}{$2 \times \Zplus$}{\glr{GetIntegerv}}{see \ref{view:port}}{Max. viewport dimensions}{\ref{view:port}}{--}
+
+\cbentry{MAX\_SAMPLES}{$\Zplus$}{\glr{GetIntegerv}}{4}{Max. no. of samples supported for multisampling {\ochange for all internal formats required to support multisampled rendering.}}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+
+\doentry{MAX\_SAMPLE\_MASK\_WORDS}{$\Zplus$}{\glr{GetIntegerv}}{1}{Max. no. of sample mask words}{\ref{multisample:fragment}}{--}
+\doentry{MAX\_COLOR\_TEXTURE\_SAMPLES}{$\Zplus$}{\glr{GetIntegerv}}{1}{Max. no. of samples in a color multisample texture\ochange\fn1}{\ref{multisample:fragment}}{--}
+\doentry{MAX\_DEPTH\_TEXTURE\_SAMPLES}{$\Zplus$}{\glr{GetIntegerv}}{1}{Max. no. of samples in a depth/stencil multisample texture\ochange\fn1}{\ref{multisample:fragment}}{--}
+\doentry{MAX\_INTEGER\_SAMPLES}{$\Zplus$}{\glr{GetIntegerv}}{1}{Max. no. of samples in integer format multisample buffers\ochange\fn1}{\ref{framebuf:fbo:images:renderbuffers}}{--}
+
+\doentry{MAX\_SERVER\_WAIT\_TIMEOUT}{$\Zplus$}{\glr{GetInteger64v}}{0}{Max. \glr{WaitSync} timeout interval}{\ref{sync:waiting}}{--}
+
+\doentry{LAYER\_PROVOKING\_VERTEX}{$\Enum$}{\glr{GetIntegerv}}{See sec.~\ref{geomshad:exec}}{Vertex convention followed by \glv{gl\_Layer}}{\ref{geomshad:exec}}{--}
+
+\doentry{PRIMITIVE\_RESTART\_FOR\_PATCHES\_SUPPORTED}{$B$}{\glr{GetBooleanv}}{--}{Primitive restart support for \glc{PATCHES}}{\ref{vert:array:restart}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetabledifferentindexcaption}{Implementation Dependent Values (cont.)                 % Table 6.44     statetab:impl6
+    \par \small \fn1 The value of
+        {\small\tt TEXTURE\_BUFFER\_OFFSET\_ALIGNMENT} is the maximum
+        allowed, not the minimum.
+    }{statetab:impl3}{Implementation Dependent Values (cont.)}
+\newshortlimitstart
+
+\doentry{MAX\_VERTEX\_ATTRIB\_RELATIVE\_OFFSET}{$Z$}{\glr{GetIntegerv}}{2047}{Max. offset added to vertex buffer binding offset}{\ref{vert:array}}{--}
+\doentry{MAX\_VERTEX\_ATTRIB\_BINDINGS}{$Z$}{\glr{GetIntegerv}}{16}{Max. no. of vertex buffers}{\ref{vert:array}}{--}
+\doentry{MAX\_VERTEX\_ATTRIB\_STRIDE}{$Z$}{\glr{GetIntegerv}}{2048}{Max. vertex attribute stride}{\ref{vert:array}}{--}
+
+\doentry{MAX\_ELEMENTS\_INDICES}{$\Zplus$}{\glr{GetIntegerv}}{--}{Recommended max. no. of \glr{DrawRangeElements} indices}{\ref{vert:array}}{--}
+\doentry{MAX\_ELEMENTS\_VERTICES}{$\Zplus$}{\glr{GetIntegerv}}{--}{Recommended max. no. of \glr{DrawRangeElements} vertices}{\ref{vert:array}}{--}
+
+\doentry{MAX\_TEXTURE\_BUFFER\_SIZE}{$\Zplus$}{\glr{GetIntegerv}}{65536}{No. of addressable texels for buffer textures}{\ref{tex:texbo}}{--}
+
+\doentry{NUM\_COMPRESSED\_TEXTURE\_FORMATS}{$\Zplus$}{\glr{GetIntegerv}}{10}{No. of compressed texture formats}{\ref{tex:compteximg}}{--}
+\doentry{COMPRESSED\_TEXTURE\_FORMATS}{$10* \times \Zplus$}{\glr{GetIntegerv}}{--}{Enumerated compressed texture formats}{\ref{tex:compteximg}}{--}
+
+\doentry{NUM\_PROGRAM\_BINARY\_FORMATS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of program binary formats}{\ref{vertshad:progbinaries}}{--}
+\doentry{PROGRAM\_BINARY\_FORMATS}{$0* \times \Zplus$}{\glr{GetIntegerv}}{--}{Enumerated program binary formats}{\ref{vertshad:progbinaries}}{--}
+
+\doentry{NUM\_SHADER\_BINARY\_FORMATS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of shader binary formats}{\ref{vertshad:shadbinaries}}{--}
+\doentry{SHADER\_BINARY\_FORMATS}{$0* \times \Zplus$}{\glr{GetIntegerv}}{--}{Enumerated shader binary formats}{\ref{vertshad:shadbinaries}}{--}
+
+\doentry{SHADER\_COMPILER}{$B$}{\glr{GetBooleanv}}{--}{Shader compiler supported, always \glc{TRUE}}{\ref{vertshad}}{--}
+
+\doentry{TEXTURE\_BUFFER\_OFFSET\_ALIGNMENT}{$\Zplus$}{\glr{GetIntegerv}}{256\fn1}{Min. required alignment for texture buffer offsets}{\ref{tex:texbo}}{--}
+
+\doentry{--}{$2 \times 6 \times 2 \times \Zplus$}{\glr{GetShader\-PrecisionFormat}}{--}{Shader data type ranges}{\ref{gets:shader}}{--}
+\doentry{--}{$2 \times 6 \times \Zplus$}{\glr{GetShader\-PrecisionFormat}}{--}{Shader data type precisions}{\ref{gets:shader}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetable}{Implementation Dependent Version and Extension Support}{statetab:implvers}   % Table 6.40
+\newshortlimitstart
+
+\doentry{EXTENSIONS}{$0* \times S$}{\glr{GetStringi}}{--}{Supported individual extension names}{\ref{gets:string}}{--}
+\doentry{NUM\_EXTENSIONS}{$\Zplus$}{\glr{GetIntegerv}}{--}{No. of individual extension names}{\ref{gets:string}}{--}
+\doentry{MAJOR\_VERSION}{$\Zplus$}{\glr{GetIntegerv}}{3}{Major version no. supported}{\ref{gets:string}}{--}
+\doentry{MINOR\_VERSION}{$\Zplus$}{\glr{GetIntegerv}}{--}{Minor version no. supported}{\ref{gets:string}}{--}
+\doentry{CONTEXT\_FLAGS}{$\Zplus$}{\glr{GetIntegerv}}{--}{Context flags}{\ref{gets:string}}{--}
+\doentry{RENDERER}{$S$}{\glr{GetString}}{--}{Renderer string}{\ref{gets:string}}{--}
+\doentry{SHADING\_LANGUAGE\_VERSION}{$S$}{\glr{GetString}}{--}{Shading Language version supported}{\ref{gets:string}}{--}
+\doentry{VENDOR}{$S$}{\glr{GetString}}{--}{Vendor string}{\ref{gets:string}}{--}
+\doentry{VERSION}{$S$}{\glr{GetString}}{--}{OpenGL ES version supported}{\ref{gets:string}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Implementation Dependent Vertex Shader Limits}{statetab:implvert}            % Table 6.41
+\newshortlimitstart
+
+% MAKE SURE TO UPDATE \mvtxattr AT TOP when changing this!
+\doentry{MAX\_VERTEX\_ATTRIBS}{$\Zplus$}{\glr{GetIntegerv}}{$\mvtxattr$}{No. of active vertex attributes}{\ref{vert:spec}}{--}
+\doentry{MAX\_VERTEX\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{1024}{No. of components for vertex shader uniform variables}{\ref{vertshad:vars:uniform}}{--}
+\doentry{MAX\_VERTEX\_UNIFORM\_VECTORS}{$\Zplus$}{\glr{GetIntegerv}}{256}{No. of vectors for vertex shader uniform variables}{\ref{vertshad:vars:uniform}}{--}
+\doentry{MAX\_VERTEX\_UNIFORM\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{12}{Max. no. of vertex uniform buffers per program}{\ref{vertshad:vars:ubo}}{--}
+\doentry{MAX\_VERTEX\_OUTPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{64}{Max. no. of components of outputs written by a vertex shader}{\ref{vertshad:vars:varying}}{-}
+\doentry{MAX\_VERTEX\_TEXTURE\_IMAGE\_UNITS}{$\Zplus$}{\glr{GetIntegerv}}{16}{No. of texture image units accessible by a vertex shader}{\ref{vertshad:exec:texture}}{--}
+\doentry{MAX\_VERTEX\_ATOMIC\_COUNTER\_BUFFERS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of atomic counter buffers accessed by a vertex shader}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_VERTEX\_ATOMIC\_COUNTERS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of atomic counters accessed by a vertex shader}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_VERTEX\_SHADER\_STORAGE\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of shader storage blocks accessed by a vertex shader}{\ref{shader:bufvars}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Implementation Dependent Tessellation Shader Limits}{statetab:impltess}              % Table 23.59
+\newshortlimitstart
+
+\doentry{MAX\_TESS\_GEN\_LEVEL}{$\Zplus$}{\glr{GetIntegerv}}{64}{Max. level supported by tess. primitive generator}{\ref{tess:primgen}}{--}
+\doentry{MAX\_PATCH\_VERTICES}{$\Zplus$}{\glr{GetIntegerv}}{32}{Max. patch size}{\ref{primtypes}}{--}
+\doentry{MAX\_TESS\_CONTROL\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{1024}{No. of words for tess. control shader (TCS) uniforms}{\ref{tess:controlshad:vars}}{--}
+\doentry{MAX\_TESS\_CONTROL\_TEXTURE\_IMAGE\_UNITS}{$\Zplus$}{\glr{GetIntegerv}}{16}{No. of tex. image units for TCS}{\ref{vertshad:exec}}{--}
+\doentry{MAX\_TESS\_CONTROL\_OUTPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{64}{No. components for TCS per-vertex outputs}{\ref{tess:controlshad:exec}}{--}
+\doentry{MAX\_TESS\_PATCH\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{120}{No. components for TCS per-patch outputs}{\ref{tess:controlshad:exec}}{--}
+  % Sync with OES updates
+  % \ochange{Bug 12823}
+\doentry{MAX\_TESS\_CONTROL\_TOTAL\_OUTPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{\ochange 2048}{Total no. components for TCS per-patch outputs}{\ref{tess:controlshad:exec}}{--}
+\doentry{MAX\_TESS\_CONTROL\_INPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{64}{No. components for TCS per-vertex inputs}{\ref{tess:controlshad:exec}}{--}
+    %% ???> Verify that \mblockstage == 12
+\doentry{MAX\_TESS\_CONTROL\_UNIFORM\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{$\mblockstage*$}{No. of supported uniform blocks for TCS}{\ref{vertshad:vars:ubo}}{--}
+\doentry{MAX\_TESS\_CONTROL\_ATOMIC\_COUNTER\_BUFFERS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of atomic counter (AC) buffers accessed by a TCS}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_TESS\_CONTROL\_ATOMIC\_COUNTERS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of ACs accessed by a TCS}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_TESS\_CONTROL\_SHADER\_STORAGE\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of shader storage blocks accessed by a tess. control shader}{\ref{shader:bufvars}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Implementation Dependent Tessellation Shader Limits (cont.)}{statetab:impltess2}     % Table 6
+\newshortlimitstart
+
+\doentry{MAX\_TESS\_EVALUATION\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{1024}{No. of words for tess. evaluation shader (TES) uniforms}{\ref{tess:evalshad:vars}}{--}
+\doentry{MAX\_TESS\_EVALUATION\_TEXTURE\_IMAGE\_UNITS}{$\Zplus$}{\glr{GetIntegerv}}{16}{No. of tex. image units for TES}{\ref{vertshad:exec}}{--}
+\doentry{MAX\_TESS\_EVALUATION\_OUTPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{64}{No. components for TES per-vertex outputs}{\ref{tess:evalshad:exec}}{--}
+\doentry{MAX\_TESS\_EVALUATION\_INPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{64}{No. components for TES per-vertex inputs}{\ref{tess:evalshad:exec}}{--}
+\doentry{MAX\_TESS\_EVALUATION\_UNIFORM\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{$\mblockstage*$}{No. of supported uniform blocks for TES}{\ref{vertshad:vars:ubo}}{--}
+\doentry{MAX\_TESS\_EVALUATION\_ATOMIC\_COUNTER\_BUFFERS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of AC buffers accessed by a TES}{\ref{vertshad:exec:atomic}}{--}
+\doentry{MAX\_TESS\_EVALUATION\_ATOMIC\_COUNTERS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of ACs accessed by a TES}{\ref{vertshad:exec:atomic}}{--}
+\doentry{MAX\_TESS\_EVALUATION\_SHADER\_STORAGE\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of shader storage blocks accessed by a tess. evaluation shader}{\ref{shader:bufvars}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+\begin{statetable}{Implementation Dependent Geometry Shader Limits}{statetab:implgeom}                  % Table 23.60
+\newshortlimitstart
+
+\doentry{MAX\_GEOMETRY\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{1024}{No. of components for geometry shader (GS) uniform variables}{\ref{geomshad:vars}}{--}
+\doentry{MAX\_GEOMETRY\_UNIFORM\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{$\mblockstage*$}{Max. no. of GS uniform buffers per program}{\ref{vertshad:vars:ubo}}{--}
+\doentry{MAX\_GEOMETRY\_INPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{64}{Max. no. of components of inputs read by a GS}{\ref{geomshad:exec:input}}{--}
+\doentry{MAX\_GEOMETRY\_OUTPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{64}{Max. no. of components of outputs written by a GS}{\ref{geomshad:exec:output}}{--}
+\doentry{MAX\_GEOMETRY\_OUTPUT\_VERTICES}{$\Zplus$}{\glr{GetIntegerv}}{256}{Max. no. of vertices that any GS {can} emit}{\ref{geomshad:exec}}{--}
+\doentry{MAX\_GEOMETRY\_TOTAL\_OUTPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{1024}{Max. no. of total components (all vertices) of active outputs that a GS can emit}{\ref{geomshad:exec}}{--}
+% Could use \mtexcoord but safer to just use 16 (== 1/3 of \mteximage)
+\doentry{MAX\_GEOMETRY\_TEXTURE\_IMAGE\_UNITS}{$\Zplus$}{\glr{GetIntegerv}}{16}{No. of texture image units accessible by a GS}{\ref{geomshad:exec}}{--}
+\doentry{MAX\_GEOMETRY\_SHADER\_INVOCATIONS}{$\Zplus$}{\glr{GetIntegerv}}{32}{Max. supported GS invocation count}{\ref{geomshad:exec:instanced}}{--}
+\doentry{MAX\_GEOMETRY\_ATOMIC\_COUNTER\_BUFFERS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of atomic counter buffers accessed by a GS}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_GEOMETRY\_ATOMIC\_COUNTERS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of atomic counters accessed by a GS}{\ref{vertshad:exec:atomic}}{--}
+\doentry{MAX\_GEOMETRY\_SHADER\_STORAGE\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of shader storage blocks accessed by a GS}{\ref{shader:bufvars}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Implementation Dependent Fragment Shader Limits}{statetab:implfrag}          % Table 6.43
+\newshortlimitstart
+
+\doentry{MAX\_FRAGMENT\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{1024}{No. of components for fragment shader uniform variables}{\ref{fragshad:vars}}{--}
+\doentry{MAX\_FRAGMENT\_UNIFORM\_VECTORS}{$\Zplus$}{\glr{GetIntegerv}}{256}{No. of vectors for fragment shader uniform variables}{\ref{fragshad:vars}}{--}
+\doentry{MAX\_FRAGMENT\_UNIFORM\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{12}{Max. no. of fragment uniform buffers per program}{\ref{vertshad:vars:ubo}}{--}
+\doentry{MAX\_FRAGMENT\_INPUT\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{60}{Max. no. of components of inputs read by a fragment shader}{\ref{fragshad:exec:input}}{-}
+\doentry{MAX\_TEXTURE\_IMAGE\_UNITS}{$\Zplus$}{\glr{GetIntegerv}}{16}{No. of texture image units accessible by a fragment shader}{\ref{vertshad:exec:texture}}{--}
+\doentry{MAX\_FRAGMENT\_ATOMIC\_COUNTER\_BUFFERS}{$\Zplus$}{\glr{GetIntegerv}}{1}{No. of atomic counter buffers accessed by a fragment shader}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_FRAGMENT\_ATOMIC\_COUNTERS}{$\Zplus$}{\glr{GetIntegerv}}{8}{No. of atomic counters accessed by a fragment shader}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_FRAGMENT\_SHADER\_STORAGE\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{4}{No. of shader storage blocks accessed by a fragment shader}{\ref{shader:bufvars}}{--}
+\doentry{MIN\_PROGRAM\_TEXTURE\_GATHER\_OFFSET}{$Z$}{\glr{GetIntegerv}}{--}{Min. texel offset for \glv{textureGather}}{\ref{tex:minf}}{--}
+\doentry{MAX\_PROGRAM\_TEXTURE\_GATHER\_OFFSET}{$\Zplus$}{\glr{GetIntegerv}}{--}{Max. texel offset for \glv{textureGather}}{\ref{tex:minf}}{--}
+
+\doentry{MIN\_PROGRAM\_TEXEL\_OFFSET}{$Z$}{\glr{GetIntegerv}}{-8}{Min. texel offset allowed in lookup}{\ref{vertshad:exec:texture}}{--}
+\doentry{MAX\_PROGRAM\_TEXEL\_OFFSET}{$Z$}{\glr{GetIntegerv}}{7}{Max. texel offset allowed in lookup}{\ref{vertshad:exec:texture}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetabledifferentindexcaption}{Implementation Dependent Compute
+    Shader Limits
+    \par \small \fn1 The minimum value is
+    \glc{MAX\_COMPUTE\_UNIFORM\_BLOCKS} $\times$
+    \glc{MAX\_UNIFORM\_BLOCK\_SIZE} / 4 +
+    \glc{MAX\_COMPUTE\_UNIFORM\_COMPONENTS}}{statetab:implcompute}
+    {Implementation Dependent Compute Shader Limits}
+\newshortlimitstart
+
+\doentry{MAX\_COMPUTE\_WORK\_GROUP\_COUNT}{$3 \times \Zplus$}{\glr{GetIntegeri\_v}}{65535}{Max. no. of workgroups that may be dispatched by a single dispatch command (per dimension)}{\ref{computeshad}}{--}
+\doentry{MAX\_COMPUTE\_WORK\_GROUP\_SIZE}{$3 \times \Zplus$}{\glr{GetIntegeri\_v}}{128 (x, y), 64 (z)}{Max. local size of a compute workgroup (per dimension)}{\ref{computeshad}}{--}
+\doentry{MAX\_COMPUTE\_WORK\_GROUP\_INVOCATIONS}{$\Zplus$}{\glr{GetIntegerv}}{128}{Max. total compute shader (CS) invocations in a single local workgroup}{\ref{computeshad}}{--}
+\doentry{MAX\_COMPUTE\_UNIFORM\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{12}{Max. no. of uniform blocks per compute program}{\ref{vertshad:exec}}{--}
+\doentry{MAX\_COMPUTE\_TEXTURE\_IMAGE\_UNITS}{$\Zplus$}{\glr{GetIntegerv}}{16}{Max. no. of texture image units accessible by a CS}{\ref{vertshad:exec}}{--}
+
+\doentry{MAX\_COMPUTE\_SHARED\_MEMORY\_SIZE}{$\Zplus$}{\glr{GetIntegerv}}{16384}{Max. total storage size of all variables declared as {\em shared} in all CSs linked into a single program object}{\ref{computeshad:vars}}{--}
+\doentry{MAX\_COMPUTE\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{1024}{No. of components for CS uniform variables}{\ref{computeshad:vars}}{--}
+
+\doentry{MAX\_COMPUTE\_ATOMIC\_COUNTER\_BUFFERS}{$\Zplus$}{\glr{GetIntegerv}}{1}{No. of atomic counter buffers accessed by a CS}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_COMPUTE\_ATOMIC\_COUNTERS}{$\Zplus$}{\glr{GetIntegerv}}{8}{No. of atomic counters accessed by a CS}{\ref{vertshad:exec}}{--}
+
+\doentry{MAX\_COMBINED\_COMPUTE\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{\fn1}{No. of words for CS uniform variables in all uniform blocks, including the default}{\ref{computeshad:vars}}{--}
+\doentry{MAX\_COMPUTE\_SHADER\_STORAGE\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{4}{No. of shader storage blocks accessed by a compute shader}{\ref{shader:bufvars}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetabledifferentindexcaption}{Implementation Dependent Aggregate Shader Limits        % Table 6.44     statetab:impl6
+    \par \small \fn1 The value of
+        {\small\tt UNIFORM\_BUFFER\_OFFSET\_ALIGNMENT} is the maximum
+        allowed, not the minimum.
+    \par \small \fnb The minimum value for each stage is
+    {\small\tt MAX\_{\em{stage}}\_UNIFORM\_BLOCKS} $\times$
+    {\small\tt MAX\_UNIFORM\_BLOCK\_SIZE / 4} +
+    {\small\tt MAX\_{\em{stage}}\_UNIFORM\_COMPONENTS}.
+    The limit is totalled for all uniform variables in all uniform blocks,
+    including the default.
+    }{statetab:impl6}{Implementation Dependent Aggregate Shader Limits}
+\newshortlimitstart
+
+\doentry{MAX\_UNIFORM\_BUFFER\_BINDINGS}{$\Zplus$}{\glr{GetIntegerv}}{72}{Max. no. of uniform buffer binding points on the context}{\ref{vertshad:vars:ubo}}{--}
+
+\doentry{MAX\_UNIFORM\_BLOCK\_SIZE}{$\Zplus$}{\glr{GetInteger64v}}{16384}{Max. size in basic machine units of a uniform block}{\ref{vertshad:vars:ubo}}{--}
+\doentry{UNIFORM\_BUFFER\_OFFSET\_ALIGNMENT}{$\Zplus$}{\glr{GetIntegerv}}{256\fn1}{{Min.} required alignment for uniform buffer sizes and offsets}{\ref{vertshad:vars:ubo}}{--}
+
+\doentry{MAX\_COMBINED\_UNIFORM\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{$\mblockcombined*$}{Max. no. of uniform buffers per program}{\ref{vertshad:vars:ubo}}{--}
+
+\doentry{MAX\_COMBINED\_VERTEX\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetInteger64v}}{\fnb}{No. of words for vertex shader uniform var. in all uniform blocks (incl. default)}{\ref{vertshad:vars:ubo}}{--}
+\doentry{MAX\_COMBINED\_TESS\_CONTROL\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{\fn1}{No. of words for TCS uniform var. in all uniform blocks (incl. default)}{\ref{tess:controlshad:vars}}{--}
+\doentry{MAX\_COMBINED\_TESS\_EVALUATION\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{\fn1}{No. of words for TES uniform var. in all uniform blocks (incl. default)}{\ref{tess:evalshad:vars}}{--}
+\doentry{MAX\_COMBINED\_GEOMETRY\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{\fn1}{No. of words for geometry shader uniform var. in all uniform blocks (incl. default)}{\ref{vertshad:vars:ubo}}{--}
+\doentry{MAX\_COMBINED\_FRAGMENT\_UNIFORM\_COMPONENTS}{$\Zplus$}{\glr{GetInteger64v}}{\fnb}{No. of words for fragment shader uniform var. in all uniform blocks (incl. default)}{\ref{vertshad:vars:ubo}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetable}{Implementation Dependent Aggregate Shader Limits (cont.)}{statetab:impl7}
+\newshortlimitstart
+
+\doentry{MAX\_VARYING\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{60}{No. of components for output variables}{\ref{vertshad:vars:varying}}{--}
+\doentry{MAX\_VARYING\_VECTORS}{$\Zplus$}{\glr{GetIntegerv}}{15}{No. of vectors for output variables}{\ref{vertshad:vars:varying}}{--}
+\doentry{MAX\_COMBINED\_TEXTURE\_IMAGE\_UNITS}{$\Zplus$}{\glr{GetIntegerv}}{$\mteximage$}{Total no. of texture units accessible by the GL}{\ref{vertshad:exec:texture}}{--}
+
+\doentry{MAX\_COMBINED\_SHADER\_OUTPUT\_RESOURCES}{$\Zplus$}{\glr{GetIntegerv}}{4}{Limit on active image units, shader storage blocks, and frag. outputs}{\ref{tex:loadstore}}{--}
+
+\doentry{MAX\_UNIFORM\_LOCATIONS}{$\Zplus$}{\glr{GetIntegerv}}{1024}{Max. no. of user-assignable uniform locations}{\ref{vertshad:vars:uniform}}{--}
+
+\doentry{MAX\_ATOMIC\_COUNTER\_BUFFER\_BINDINGS}{$\Zplus$}{\glr{GetIntegerv}}{1}{Max. no. of atomic counter buffer bindings}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_ATOMIC\_COUNTER\_BUFFER\_SIZE}{$\Zplus$}{\glr{GetIntegerv}}{32}{Max. size in basic machine units of an atomic counter buffer}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_COMBINED\_ATOMIC\_COUNTER\_BUFFERS}{$\Zplus$}{\glr{GetIntegerv}}{1}{Max. no. of atomic counter buffers per program}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+\doentry{MAX\_COMBINED\_ATOMIC\_COUNTERS}{$\Zplus$}{\glr{GetIntegerv}}{8}{Max. no. of atomic counter uniforms per program}{\ref{vertshad:vars:ubo:atomuniform}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetabledifferentindexcaption}{Implementation Dependent Aggregate Shader Limits (cont.)
+    \par \small \fn1 The value of
+        {\small\tt SHADER\_STORAGE\_BUFFER\_OFFSET\_ALIGNMENT} is the
+        maximum allowed, not the minimum.}
+    {statetab:implaggshader2}{Implementation Dependent Aggregate Shader Limits (cont.)}
+\newlimitstart
+
+\doentry{MAX\_IMAGE\_UNITS}{$\Zplus$}{\glr{GetIntegerv}}{$\mimageunit$}{No. of units for image load/store/atomics}{\ref{tex:loadstore}}{--}
+
+\doentry{MAX\_VERTEX\_IMAGE\_UNIFORMS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of image variables in vertex shaders}{\ref{vertshad:exec}}{--}
+\doentry{MAX\_TESS\_CONTROL\_IMAGE\_UNIFORMS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of image variables in tess. control shaders}{\ref{vertshad:exec:imageaccess}}{--}
+\doentry{MAX\_TESS\_EVALUATION\_IMAGE\_UNIFORMS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of image variables in tess. eval. shaders}{\ref{vertshad:exec:imageaccess}}{--}
+\doentry{MAX\_GEOMETRY\_IMAGE\_UNIFORMS}{$\Zplus$}{\glr{GetIntegerv}}{0}{No. of image variables in geometry shaders}{\ref{vertshad:exec:imageaccess}}{--}
+\doentry{MAX\_FRAGMENT\_IMAGE\_UNIFORMS}{$\Zplus$}{\glr{GetIntegerv}}{4}{No. of image variables in fragment shaders}{\ref{vertshad:exec}}{--}
+\doentry{MAX\_COMPUTE\_IMAGE\_UNIFORMS}{$\Zplus$}{\glr{GetIntegerv}}{4}{No. of image variables in CSs}{\ref{vertshad:exec}}{--}
+
+\doentry{MAX\_COMBINED\_IMAGE\_UNIFORMS}{$\Zplus$}{\glr{GetIntegerv}}{4}{No. of image variables in all shaders}{\ref{vertshad:exec}}{--}
+
+\doentry{MAX\_SHADER\_STORAGE\_BUFFER\_BINDINGS}{$\Zplus$}{\glr{GetIntegerv}}{4}{Max. no. of shader storage buffer bindings in the context}{\ref{shader:bufvars}}{--}
+\doentry{MAX\_SHADER\_STORAGE\_BLOCK\_SIZE}{$\Zplus$}{\glr{GetInteger64v}}{$2^{27}$}{Max. size in basic machine units of a shader storage block}{\ref{shader:bufvars}}{--}
+\doentry{MAX\_COMBINED\_SHADER\_STORAGE\_BLOCKS}{$\Zplus$}{\glr{GetIntegerv}}{4}{No. of shader storage blocks accessed by a program}{\ref{shader:bufvars}}{--}
+\doentry{SHADER\_STORAGE\_BUFFER\_OFFSET\_ALIGNMENT}{$\Zplus$}{\glr{GetIntegerv}}{256\fn1}{{Min.} required alignment for shader storage buffer binding offsets}{\ref{shader:bufvars}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetabledifferentindexcaption}{Debug Output State
+                       \par \fn1 The initial value of \glc{DEBUG\_OUTPUT}
+                        is \glc{TRUE} in a debug context and \glc{FALSE} in
+                        a non-debug context.}
+                       {statetab:debugoutput}{Debug Output State}
+\newfixshortvaluestart
+
+\doentry{DEBUG\_CALLBACK\_FUNCTION}{$Y$}{\glr{GetPointerv}}{\glc{NULL}}{The current debug output callback function pointer}{\ref{debug:callback}}{--}
+\doentry{DEBUG\_CALLBACK\_USER\_PARAM}{$Y$}{\glr{GetPointerv}}{\glc{NULL}}{The current debug output callback user parameter}{\ref{debug:callback}}{--}
+\doentry{DEBUG\_LOGGED\_MESSAGES}{$\Zplus$}{\glr{GetIntegerv}}{0}{The no. of messages currently in the debug message log}{\ref{debug:log}}{--}
+\doentry{DEBUG\_NEXT\_LOGGED\_MESSAGE\_LENGTH}{$\Zplus$}{\glr{GetIntegerv}}{0}{The string length of the oldest debug message in the debug message log}{\ref{debug:log}}{--}
+\doentry{DEBUG\_OUTPUT\_SYNCHRONOUS}{$B$}{\glr{IsEnabled}}{\glc{FALSE}}{The enabled state for synchronous debug message callbacks}{\ref{debug:async}}{--}
+\doentry{DEBUG\_GROUP\_STACK\_DEPTH}{$\Zplus$}{\glr{GetIntegerv}}{1}{Debug group stack pointer}{\ref{debug:groups}}{--}
+\doentry{DEBUG\_OUTPUT}{$B$}{\glr{IsEnabled}}{Depends on the context\fn1}{The enabled state for debug output functionality}{\ref{debug}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetable}{Implementation Dependent Debug Output State}{statetab:impldebugoutput}               % Table 23.68
+\newshortlimitstart
+
+\doentry{MAX\_DEBUG\_MESSAGE\_LENGTH}{$\Zplus$}{\glr{GetIntegerv}}{1}{The max length of a debug message string, including its null terminator}{\ref{debug:messages}}{--}
+\doentry{MAX\_DEBUG\_LOGGED\_MESSAGES}{$\Zplus$}{\glr{GetIntegerv}}{1}{The max no. of messages stored in the debug message log}{\ref{debug:log}}{--}
+\doentry{MAX\_DEBUG\_GROUP\_STACK\_DEPTH}{$\Zplus$}{\glr{GetIntegerv}}{64}{Max. group stack depth}{\ref{debug:groups}}{--}
+\doentry{MAX\_LABEL\_LENGTH}{$\Zplus$}{\glr{GetIntegerv}}{256}{Max. length of a label string}{\ref{debug:label}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetable}{Implementation Dependent Transform Feedback Limits}{statetab:impl9}          % Table 6.48
+\newshortlimitstart
+
+\doentry{MAX\_TRANSFORM\_FEEDBACK\_INTERLEAVED\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{64}{Max. no. of components to write to a single buffer in interleaved mode}{\ref{xformfeedback}}{--}
+\doentry{MAX\_TRANSFORM\_FEEDBACK\_SEPARATE\_ATTRIBS}{$\Zplus$}{\glr{GetIntegerv}}{4}{Max. no. of separate attributes or outputs that can be captured in transform feedback}{\ref{xformfeedback}}{--}
+\doentry{MAX\_TRANSFORM\_FEEDBACK\_SEPARATE\_COMPONENTS}{$\Zplus$}{\glr{GetIntegerv}}{4}{Max. no. of components per attribute or output in separate mode}{\ref{xformfeedback}}{--}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+
+\begin{statetabledifferentindexcaption}{Framebuffer Dependent Values
+    {\par \small \fn1 This state is queried from the currently bound read
+      framebuffer,
+        {\ochange rather than the draw framebuffer.}
+      $n$ is the value of \glc{SAMPLES}.}}{statetab:fbdepvalues}{Framebuffer Dependent Values}                        % Table 6.46
+\newshortlimitstart
+
+\doentry{SAMPLE\_BUFFERS}{$Z_2$}{\glr{GetIntegerv}}{0}{No. of multisample buffers}{\ref{multisample}}{--}
+\doentry{SAMPLES}{$\Zplus$}{\glr{GetIntegerv}}{0}{Coverage mask size}{\ref{multisample}}{--}
+
+\doentry{$x$\_BITS}{$\Zplus$}{\glr{GetIntegerv}}{--}{No. of bits in $x$ color buffer component. $x$ is one of \glc{RED}, \glc{GREEN}, \glc{BLUE}, \glc{ALPHA}}{\ref{framebuf}}{--}
+
+\doentry{DEPTH\_BITS}{$\Zplus$}{\glr{GetIntegerv}}{--}{No. of depth buffer planes}{\ref{framebuf}}{--}
+\doentry{STENCIL\_BITS}{$\Zplus$}{\glr{GetIntegerv}}{--}{No. of stencil planes}{\ref{framebuf}}{--}
+
+\doentry{IMPLEMENTATION\_COLOR\_READ\_TYPE}{$\Enum$}{\glr{GetIntegerv}}{--}{Implementation preferred pixel {\em type} \fn1}{\ref{pix:read}}{--}
+\doentry{IMPLEMENTATION\_COLOR\_READ\_FORMAT}{$\Enum$}{\glr{GetIntegerv}}{--}{Implementation preferred pixel {\em format} \fn1}{\ref{pix:read}}{--}
+
+\doentry{SAMPLE\_POSITION}{$n \times 2 \times R^{[0,1]}$}{\glr{GetMultisamplefv}}{impl-dependent}{Explicit sample positions}{\ref{multisample}}{--}
+
+\hline
+\end{tabular}
+\end{statetabledifferentindexcaption}
+
+
+\begin{statetable}{Miscellaneous}{statetab:misc}                                                % Table 6.48
+\newstart
+
+\doentry{--}{$n \times \Enum$}{\glr{GetError}}{0}{Current error code(s)}{\ref{errors}}{--}
+\doentry{--}{$n \times B$}{--}{\glc{FALSE}}{True if there is a corresponding error}{\ref{errors}}{--}
+
+\doentry{CURRENT\_QUERY}{$3 \times \Zplus$}{\glr{GetQueryiv}}{0}{Active query object names}{\ref{state:occquery}}{--}
+
+\doentry{COPY\_READ\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Buffer object bound to copy buffer ``read'' bind point}{\ref{vert:vbo:copy}}{--}
+\doentry{COPY\_WRITE\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Buffer object bound to copy buffer ``write'' bind point}{\ref{vert:vbo:copy}}{--}
+
+\doentry{RESET\_NOTIFICATION\_STRATEGY}{$Z_2$}{\glr{GetIntegerv}}{See sec.~\ref{fund:reset}}{Reset notification behavior}{\ref{fund:reset}}{--}
+
+\doentry{TEXTURE\_BUFFER\_BINDING}{$\Zplus$}{\glr{GetIntegerv}}{0}{Buffer object bound to generic texture buffer bind point}{\ref{tex:object}}{texture}
+
+\hline
+\end{tabular}
+\end{statetable}
+
+\normalsize
+
