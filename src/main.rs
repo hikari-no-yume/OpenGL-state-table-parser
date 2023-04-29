@@ -39,27 +39,71 @@ enum Condition {
     CompatibilityOnly,
 }
 
+/// An entry in one of the state tables, representing a state variable
 struct Entry {
+    /// If this is [Some], the entry is only defined when this condition
+    /// applies.
     condition: Option<Condition>,
-    cells: Vec<String>,
+    /// "Get value" (symbolic constant to pass to "Get command")
+    get_value: String,
+    /// "Type"
+    type_: String,
+    /// "Get command" (function that can query this state variable)
+    get_cmnd: String,
+    /// "Initial value"
+    initial_value: String,
+    /// "Description"
+    description: String,
+    /// "Attribute"
+    attribute: String,
 }
 
-fn main() {
-    let mut args = std::env::args();
-    // Skip argv[0] (binary name)
-    args.next();
+fn unescape(cell: &str) -> String {
+    cell
+        // Unescape underscores
+        .replace("\\_", "_")
+        // Remove line-wrap hyphenation
+        .replace("\\-", "")
+}
 
-    let filename = args
-        .next()
-        .expect("Please specify a filename and number of columns");
-    let column_count = args
-        .next()
-        .expect("Please specify a filename and number of columns");
-    let column_count: u32 = column_count.parse().expect("Invalid column count");
-    if args.next().is_some() {
-        panic!("Too many arguments");
+fn process_row(is_es11: bool, condition: Option<Condition>, cells: [&str; 6]) -> Entry {
+    let [get_value, type_, get_cmnd, initial_value, description, attribute] = cells;
+
+    let get_value = unescape(get_value);
+
+    // In ES 1.1's spec, the whole type is implicitly inline math
+    let type_ = if is_es11 {
+        format!("${}$", type_)
+    } else {
+        type_.to_string()
+    };
+
+    let get_cmnd = unescape(if is_es11 || get_cmnd == "--" || get_cmnd == "-" {
+        get_cmnd
+    } else {
+        get_cmnd
+            .strip_prefix("\\glr{")
+            .unwrap()
+            .strip_suffix('}')
+            .unwrap()
+    });
+
+    let initial_value = unescape(initial_value);
+    let description = unescape(description);
+    let attribute = attribute.to_string();
+
+    Entry {
+        condition,
+        get_value,
+        type_,
+        get_cmnd,
+        initial_value,
+        description,
+        attribute,
     }
+}
 
+fn parse_spec(filename: &std::path::Path, is_es11: bool) -> Vec<Entry> {
     // Read text from file while removing comments
     let mut text = String::new();
     let file = std::fs::File::open(filename).expect("Can't open file");
@@ -121,25 +165,65 @@ fn main() {
         text = &text[text.find('{').unwrap()..];
 
         let mut cells = Vec::new();
+        let column_count = if is_es11 { 8 } else { 7 };
         for _ in 0..column_count {
             let (cell, new_text) = read_cell(text);
-            cells.push(cell.to_string());
+            cells.push(cell);
             text = new_text;
         }
-        entries.push(Entry { condition, cells });
+
+        // The section (cells[6]/cells[5]) is ignored because we don't have
+        // access to the LaTeX source of the full spec, so we can't resolve
+        // the ID to a section number
+        let cells = if is_es11 {
+            [cells[4], cells[1], cells[3], cells[2], cells[5], cells[7]]
+        } else {
+            [cells[0], cells[1], cells[2], cells[3], cells[4], cells[6]]
+        };
+        entries.push(process_row(is_es11, condition, cells));
     }
 
+    entries
+}
+
+fn print_table(entries: &[Entry]) {
     println!("<table>");
-    for Entry { condition, cells } in entries {
-        let color = condition.map(|condition| match condition {
+    println!("<thead>");
+    println!("<th>Get value</th>");
+    println!("<th>Type</th>");
+    println!("<th>Get command</th>");
+    println!("<th>Initial value</th>");
+    println!("<th>Description</th>");
+    println!("<th>Attribute</th>");
+    println!("</thead>");
+    println!("<tbody>");
+    for entry in entries {
+        let color = entry.condition.map(|condition| match condition {
             Condition::CompatibilityOnly => "pink",
             Condition::CoreOnly => "lightgreen",
         });
         if let Some(color) = color {
-            print!("<tr style=\"background-color:{}\">", color);
+            println!("<tr style=\"background-color:{}\">", color);
         } else {
-            print!("<tr>");
+            println!("<tr>");
         }
-        println!("<td>{}</td></tr>", cells.join("</td><td>"));
+        println!("<td>{}</td>", entry.get_value);
+        println!("<td>{}</td>", entry.type_);
+        println!("<td>{}</td>", entry.get_cmnd);
+        println!("<td>{}</td>", entry.initial_value);
+        println!("<td>{}</td>", entry.description);
+        println!("<td>{}</td>", entry.attribute);
+        println!("</tr>");
+    }
+    println!("</tbody>");
+    println!("</table>");
+}
+
+fn main() {
+    for spec in ["es11", "es", "gl"] {
+        let filename = format!("tables_src/gettables.{}.tex", spec);
+        let entries = parse_spec(std::path::Path::new(&filename), spec == "es11");
+        println!("<h1>State table entries from <tt>{}</tt></h1>", filename);
+        print_table(&entries);
     }
 }
