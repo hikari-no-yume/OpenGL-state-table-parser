@@ -50,6 +50,16 @@ struct Entry {
     condition: Option<Condition>,
     /// "Get value" (symbolic constant to pass to "Get command")
     get_value: String,
+    /// If this is `Some(n)`, there is a series of at least `n` values, and the
+    /// symbolic constant named by `get_value` is just the first of them.
+    ///
+    /// Subsequent values are referred to by the numeric value of that constant
+    /// plus the index of that value from zero, or alternatively by a constant
+    /// whose name is formed by substituting the index for `0`. The index will
+    /// be referred to in `description` as `$i$`.
+    ///
+    /// One example of such a series is `GL_TEXTURE0`.
+    series: Option<String>,
     /// "Type"
     type_: String,
     /// "Get command" (function that can query this state variable)
@@ -80,31 +90,29 @@ fn divide(type_: &str, by: usize) -> String {
 /// result in entries that have identical core and compatibility variants.
 /// This function does a simple deduplication.
 fn push_entry(entries: &mut Vec<Entry>, new_entry: Entry) {
-    if new_entry.condition.is_none() {
-        entries.push(new_entry);
-        return;
-    }
+    if new_entry.condition.is_some() {
+        for existing_entry in entries.iter_mut().rev() {
+            // These duplicates only occur within a single function. Don't waste
+            // time if we're no longer in the same section etc.
+            if existing_entry.condition.is_none()
+                || existing_entry.type_ != new_entry.type_
+                || existing_entry.get_cmnd != new_entry.get_cmnd
+                || existing_entry.initial_value != new_entry.initial_value
+                || existing_entry.description != new_entry.description
+                || existing_entry.attribute != new_entry.attribute
+            {
+                break;
+            }
 
-    for existing_entry in entries.iter_mut().rev() {
-        // These duplicates only occur within a single function. Don't waste
-        // time if we're no longer in the same section etc.
-        if existing_entry.condition.is_none()
-            || existing_entry.type_ != new_entry.type_
-            || existing_entry.get_cmnd != new_entry.get_cmnd
-            || existing_entry.initial_value != new_entry.initial_value
-            || existing_entry.description != new_entry.description
-            || existing_entry.attribute != new_entry.attribute
-        {
-            entries.push(new_entry);
-            return;
-        }
-
-        if existing_entry.get_value == new_entry.get_value {
-            assert_ne!(existing_entry.condition, new_entry.condition);
-            existing_entry.condition = None;
-            return;
+            if existing_entry.get_value == new_entry.get_value {
+                assert_ne!(existing_entry.condition, new_entry.condition);
+                existing_entry.condition = None;
+                return;
+            }
         }
     }
+
+    entries.push(new_entry);
 }
 
 fn process_row(
@@ -407,6 +415,26 @@ fn process_row(
         type_.to_string()
     };
 
+    // Match series like GL_TEXTUREn, GL_CLIP_PLANEn etc.
+    let (get_value, series, type_) = if let Some(prefix) = get_value.strip_suffix("$i$") {
+        let first_get_value = format!("{}0", prefix);
+        // Extract minimum count from type
+        let (count, type_) = type_.split_once(" \\times ").unwrap();
+        let count = count.strip_prefix('$').unwrap();
+        // Handle annoying exception
+        let count = count
+            .strip_prefix('{')
+            .and_then(|count| count.strip_suffix('}'))
+            .unwrap_or(count);
+        // "*" means "at least"
+        let count = count.strip_suffix('*').unwrap();
+        // Ensure LaTeX inline math characters are balanced in type
+        let type_ = format!("${}", type_);
+        (first_get_value, Some(count.to_string()), type_)
+    } else {
+        (get_value, None, type_)
+    };
+
     let get_cmnd = unescape(if spec == "es11" || get_cmnd == "--" || get_cmnd == "-" {
         get_cmnd
     } else {
@@ -429,6 +457,7 @@ fn process_row(
         Entry {
             condition,
             get_value,
+            series,
             type_,
             get_cmnd,
             initial_value,
@@ -553,8 +582,16 @@ fn print_table(entries: &[Entry]) {
         } else {
             println!("<tr>");
         }
-        println!("<td>{}</td>", entry.get_value);
-        println!("<td>{}</td>", entry.type_);
+        if let Some(ref minimum) = entry.series {
+            println!(
+                "<td>{} …<br>{} + (<i>n</i>-1)<br>where <i>n</i> ≥ {}</td>",
+                entry.get_value, entry.get_value, minimum,
+            );
+            println!("<td><i>n</i> × {}</td>", entry.type_);
+        } else {
+            println!("<td>{}</td>", entry.get_value);
+            println!("<td>{}</td>", entry.type_);
+        }
         println!("<td>{}</td>", entry.get_cmnd);
         println!("<td>{}</td>", entry.initial_value);
         println!("<td>{}</td>", entry.description);
