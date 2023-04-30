@@ -49,7 +49,7 @@ struct Entry {
     /// applies.
     condition: Option<Condition>,
     /// "Get value" (symbolic constant to pass to "Get command")
-    get_value: String,
+    get_value: Option<String>,
     /// Alternative "Get value", if any. This is not necessarily a synonym, e.g.
     /// `TRANSPOSE_` versions of matrices.
     ///
@@ -68,15 +68,24 @@ struct Entry {
     /// One example of such a series is `GL_TEXTURE0`.
     series: Option<String>,
     /// "Type"
-    type_: String,
+    ///
+    /// There's only one case that doesn't have a type: `GetUniform`.
+    type_: Option<String>,
     /// "Get command" (function that can query this state variable)
-    get_cmnd: String,
+    ///
+    /// If this is [None], the variable is inaccessible.
+    get_cmnd: Option<String>,
     /// "Initial value"
-    initial_value: String,
+    initial_value: Option<String>,
     /// "Description"
     description: String,
-    /// "Attribute"
-    attribute: String,
+    /// "Attribute" (which attribute group to use with `PushAttrib`/`PopAttrib`
+    /// or `PushClientAttrib`/`PopClientAttrib` as applicable)
+    ///
+    /// Attribute groups are a legacy feature that only exists in the OpenGL
+    /// compatibility profile. Not even OpenGL ES 1.1 has them, though the state
+    /// tables nonetheless include attribute group information for some reason?
+    attribute: Option<String>,
 }
 
 fn unescape(cell: &str) -> String {
@@ -415,19 +424,25 @@ fn process_row(
         }
     }
 
-    // In ES 1.1's spec, the whole type is implicitly inline math
+    // In OpenGL ES 1.1's spec, the whole type is implicitly inline math
     let type_ = if spec == "es11" {
-        format!("${}$", type_)
+        Some(format!("${}$", type_))
+    // Absent type (only example is GetUniform, which isn't in OpenGL ES 1.1)
+    } else if type_ == "$-$" {
+        None
     } else {
-        type_.to_string()
+        Some(type_.to_string())
     };
 
     let (get_value, alt_get_value, series, type_) =
+        // Match absent get value
+        if get_value == "-" || get_value == "--" {
+            (None, None, None, type_)
         // Match series like GL_TEXTUREn, GL_CLIP_PLANEn etc.
-        if let Some(prefix) = get_value.strip_suffix("$i$") {
+        } else if let Some(prefix) = get_value.strip_suffix("$i$") {
             let first_get_value = format!("{}0", prefix);
             // Extract minimum count from type
-            let (count, type_) = type_.split_once(" \\times ").unwrap();
+            let (count, type_) = type_.as_deref().unwrap().split_once(" \\times ").unwrap();
             let count = count.strip_prefix('$').unwrap();
             // Handle annoying exception
             let count = count
@@ -437,45 +452,60 @@ fn process_row(
             // "*" means "at least"
             let count = count.strip_suffix('*').unwrap();
             // Ensure LaTeX inline math characters are balanced in type
-            let type_ = format!("${}", type_);
-            (first_get_value, None, Some(count.to_string()), type_)
+            let type_ = Some(format!("${}", type_));
+            (Some(first_get_value), None, Some(count.to_string()), type_)
         // Match alternate name
         } else if let Some((get_value, alt_get_value)) = get_value.split_once(" \\hbox{(") {
             let alt_get_value = alt_get_value.strip_suffix(")}").unwrap();
             (
-                get_value.to_string(),
+                Some(get_value.to_string()),
                 Some(alt_get_value.to_string()),
                 None,
                 type_,
             )
         } else {
-            (get_value, None, None, type_)
+            (Some(get_value), None, None, type_)
         };
 
-    let get_cmnd = unescape(
-        if get_cmnd == "\\vbox{\\hbox{{\\bf GetIntegerv},}\\hbox{\\bf GetFloatv}}" {
-            // Weird outlier: CURRENT_COLOR has two commands listed in the
-            // OpenGL ES spec, unlike every other variable in these three specs.
-            // So far as I can tell there's no good reason for this, since even
-            // this old spec has a specific color type (C) and there doesn't seem to
-            // be any special handling for this variable. The OpenGL 4.6 spec says
-            // just GetFloatv, so let's normalise to that.
-            assert!(spec == "es11" && get_value == "CURRENT_COLOR");
-            "GetFloatv"
-        } else if spec == "es11" || get_cmnd == "--" || get_cmnd == "-" {
-            get_cmnd
-        } else {
+    let get_cmnd = if get_cmnd == "\\vbox{\\hbox{{\\bf GetIntegerv},}\\hbox{\\bf GetFloatv}}" {
+        // Weird outlier: CURRENT_COLOR has two commands listed in the
+        // OpenGL ES spec, unlike every other variable in these three specs.
+        // So far as I can tell there's no good reason for this, since even
+        // this old spec has a specific color type (C) and there doesn't seem to
+        // be any special handling for this variable. The OpenGL 4.6 spec says
+        // just GetFloatv, so let's normalise to that.
+        assert!(spec == "es11" && get_value.as_deref().unwrap() == "CURRENT_COLOR");
+        Some("GetFloatv")
+    // Absent get command
+    } else if get_cmnd == "--" || get_cmnd == "-" {
+        None
+    // The old spec doesn't use \glr{}
+    } else if spec == "es11" {
+        Some(get_cmnd)
+    } else {
+        Some(
             get_cmnd
                 .strip_prefix("\\glr{")
                 .unwrap()
                 .strip_suffix('}')
-                .unwrap()
-        },
-    );
+                .unwrap(),
+        )
+    }
+    .map(unescape);
 
-    let initial_value = unescape(initial_value);
+    let initial_value = if initial_value == "--" || initial_value == "-" {
+        None
+    } else {
+        Some(unescape(initial_value))
+    };
+
     let description = unescape(description);
-    let attribute = attribute.to_string();
+
+    let attribute = if attribute == "--" || attribute == "-" {
+        None
+    } else {
+        Some(attribute.to_string())
+    };
 
     // Note that the section is ignored because we don't have access to the
     // LaTeX source of the full spec, so we can't resolve to a section number.
@@ -613,25 +643,44 @@ fn print_table(entries: &[Entry]) {
         }
         assert!(!(entry.series.is_some() && entry.alt_get_value.is_some()));
         if let Some(ref minimum) = entry.series {
+            let first_value = entry.get_value.as_deref().unwrap();
             println!(
                 "<td>{} …<br>{} + (<i>n</i>-1)<br>where <i>n</i> ≥ {}</td>",
-                entry.get_value, entry.get_value, minimum,
+                first_value, first_value, minimum,
             );
-            println!("<td><i>n</i> × {}</td>", entry.type_);
-        } else if let Some(ref alt_get_value) = entry.alt_get_value {
-            println!(
-                "<td>{} <em>or</em><br> {}</td>",
-                entry.get_value, alt_get_value
-            );
-            println!("<td>{}</td>", entry.type_);
+            println!("<td><i>n</i> × {}</td>", entry.type_.as_deref().unwrap());
         } else {
-            println!("<td>{}</td>", entry.get_value);
-            println!("<td>{}</td>", entry.type_);
+            if let Some(ref get_value) = entry.get_value {
+                if let Some(ref alt_get_value) = entry.alt_get_value {
+                    println!("<td>{} <em>or</em><br> {}</td>", get_value, alt_get_value);
+                } else {
+                    println!("<td>{}</td>", get_value);
+                }
+            } else {
+                println!("<td>—</td>");
+            }
+            if let Some(ref type_) = entry.type_ {
+                println!("<td>{}</td>", type_);
+            } else {
+                println!("<td>—</td>");
+            }
         }
-        println!("<td>{}</td>", entry.get_cmnd);
-        println!("<td>{}</td>", entry.initial_value);
+        if let Some(ref get_cmnd) = entry.get_cmnd {
+            println!("<td>{}</td>", get_cmnd);
+        } else {
+            println!("<td>—</td>");
+        }
+        if let Some(ref initial_value) = entry.initial_value {
+            println!("<td>{}</td>", initial_value);
+        } else {
+            println!("<td>—</td>");
+        }
         println!("<td>{}</td>", entry.description);
-        println!("<td>{}</td>", entry.attribute);
+        if let Some(ref attribute) = entry.attribute {
+            println!("<td>{}</td>", attribute);
+        } else {
+            println!("<td>—</td>");
+        }
         println!("</tr>");
     }
     println!("</tbody>");
