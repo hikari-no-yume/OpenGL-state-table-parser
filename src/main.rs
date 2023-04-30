@@ -66,19 +66,57 @@ fn unescape(cell: &str) -> String {
         .replace("\\-", "")
 }
 
-fn process_row(is_es11: bool, condition: Option<Condition>, cells: [&str; 6]) -> Entry {
+fn process_row(
+    spec: &str,
+    condition: Option<Condition>,
+    cells: [&str; 6],
+    entries: &mut Vec<Entry>,
+) {
     let [get_value, type_, get_cmnd, initial_value, description, attribute] = cells;
 
     let get_value = unescape(get_value);
+    // Some of these values are parameterised for compactness. We have to handle
+    // this in one way or another, let's expand them for machine-friendliness.
+    // TEXTURE_1D, TEXTURE_2D, TEXTURE_3D, and related enums.
+    if get_value.contains("$x$D") {
+        let dimensions: &[&str] = if spec == "gl" {
+            &["1", "2", "3"]
+        } else {
+            &["2", "3"]
+        };
+        for dimension in dimensions {
+            let get_value = get_value.replace("$x$", dimension);
+            // Remove list of dimensions ("x is 1, 2, or 3.") from description,
+            // then expand.
+            let description = description
+                .split_once("; $x$ is")
+                .map_or(description, |(before, _after)| before)
+                .replace("$x$", dimension);
+            process_row(
+                spec,
+                condition,
+                [
+                    &get_value,
+                    type_,
+                    get_cmnd,
+                    initial_value,
+                    &description,
+                    attribute,
+                ],
+                entries,
+            );
+        }
+        return;
+    }
 
     // In ES 1.1's spec, the whole type is implicitly inline math
-    let type_ = if is_es11 {
+    let type_ = if spec == "es11" {
         format!("${}$", type_)
     } else {
         type_.to_string()
     };
 
-    let get_cmnd = unescape(if is_es11 || get_cmnd == "--" || get_cmnd == "-" {
+    let get_cmnd = unescape(if spec == "es11" || get_cmnd == "--" || get_cmnd == "-" {
         get_cmnd
     } else {
         get_cmnd
@@ -92,7 +130,7 @@ fn process_row(is_es11: bool, condition: Option<Condition>, cells: [&str; 6]) ->
     let description = unescape(description);
     let attribute = attribute.to_string();
 
-    Entry {
+    entries.push(Entry {
         condition,
         get_value,
         type_,
@@ -100,13 +138,14 @@ fn process_row(is_es11: bool, condition: Option<Condition>, cells: [&str; 6]) ->
         initial_value,
         description,
         attribute,
-    }
+    });
 }
 
-fn parse_spec(filename: &std::path::Path, is_es11: bool) -> Vec<Entry> {
+fn parse_spec(spec: &str) -> Vec<Entry> {
     // Read text from file while removing comments
     let mut text = String::new();
-    let file = std::fs::File::open(filename).expect("Can't open file");
+    let file =
+        std::fs::File::open(format!("tables_src/gettables.{}.tex", spec)).expect("Can't open file");
     let mut hit_divider = false;
     for line in std::io::BufRead::lines(std::io::BufReader::new(file)) {
         let line = line.unwrap();
@@ -165,7 +204,7 @@ fn parse_spec(filename: &std::path::Path, is_es11: bool) -> Vec<Entry> {
         text = &text[text.find('{').unwrap()..];
 
         let mut cells = Vec::new();
-        let column_count = if is_es11 { 8 } else { 7 };
+        let column_count = if spec == "es11" { 8 } else { 7 };
         for _ in 0..column_count {
             let (cell, new_text) = read_cell(text);
             cells.push(cell);
@@ -175,12 +214,13 @@ fn parse_spec(filename: &std::path::Path, is_es11: bool) -> Vec<Entry> {
         // The section (cells[6]/cells[5]) is ignored because we don't have
         // access to the LaTeX source of the full spec, so we can't resolve
         // the ID to a section number
-        let cells = if is_es11 {
+        let cells = if spec == "es11" {
             [cells[4], cells[1], cells[3], cells[2], cells[5], cells[7]]
         } else {
             [cells[0], cells[1], cells[2], cells[3], cells[4], cells[6]]
         };
-        entries.push(process_row(is_es11, condition, cells));
+
+        process_row(spec, condition, cells, &mut entries);
     }
 
     entries
@@ -221,9 +261,8 @@ fn print_table(entries: &[Entry]) {
 
 fn main() {
     for spec in ["es11", "es", "gl"] {
-        let filename = format!("tables_src/gettables.{}.tex", spec);
-        let entries = parse_spec(std::path::Path::new(&filename), spec == "es11");
-        println!("<h1>State table entries from <tt>{}</tt></h1>", filename);
+        let entries = parse_spec(spec);
+        println!("<h1><tt>{}</tt> state table entries</h1>", spec);
         print_table(&entries);
     }
 }
