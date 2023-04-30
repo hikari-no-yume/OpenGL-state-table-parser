@@ -29,7 +29,7 @@ fn read_cell(text: &str) -> (&str, &str) {
     (cell, remainder)
 }
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 enum Condition {
     /// This entry is only in the compatibility profile. It might have a
     /// different definition in the core profile.
@@ -40,6 +40,7 @@ enum Condition {
 }
 
 /// An entry in one of the state tables, representing a state variable
+#[derive(Debug)]
 struct Entry {
     /// If this is [Some], the entry is only defined when this condition
     /// applies.
@@ -66,17 +67,141 @@ fn unescape(cell: &str) -> String {
         .replace("\\-", "")
 }
 
+/// Remove an expected multiplication in a type, i.e. turn
+/// "A times B" into just "B".
+fn divide(type_: &str, by: usize) -> String {
+    type_.replace(&format!("{} \\times ", by), "")
+}
+
+/// The combination of the conditonal expansion and parameter expansion can
+/// result in entries that have identical core and compatibility variants.
+/// This function does a simple deduplication.
+fn push_entry(entries: &mut Vec<Entry>, new_entry: Entry) {
+    if new_entry.condition.is_none() {
+        entries.push(new_entry);
+        return;
+    }
+
+    for existing_entry in entries.iter_mut().rev() {
+        // These duplicates only occur within a single function. Don't waste
+        // time if we're no longer in the same section etc.
+        if existing_entry.condition.is_none()
+            || existing_entry.type_ != new_entry.type_
+            || existing_entry.get_cmnd != new_entry.get_cmnd
+            || existing_entry.initial_value != new_entry.initial_value
+            || existing_entry.description != new_entry.description
+            || existing_entry.attribute != new_entry.attribute
+        {
+            entries.push(new_entry);
+            return;
+        }
+
+        if existing_entry.get_value == new_entry.get_value {
+            assert_ne!(existing_entry.condition, new_entry.condition);
+            existing_entry.condition = None;
+            return;
+        }
+    }
+}
+
 fn process_row(
     spec: &str,
     condition: Option<Condition>,
-    cells: [&str; 6],
+    cells: [&str; 7],
     entries: &mut Vec<Entry>,
 ) {
-    let [get_value, type_, get_cmnd, initial_value, description, attribute] = cells;
+    let [get_value, type_, get_cmnd, initial_value, description, section, attribute] = cells;
+
+    // The description might contain a deprecation conditional. Expand both
+    // branches for machine-friendliness. This is also a prerequisite for
+    // expanding some parameterised get_value cases (see below).
+    if let Some(dep_offset) = description.find("\\dep{") {
+        let (before, after) = description.split_at(dep_offset);
+        let (conditional, after) = read_cell(&after[after.find('{').unwrap()..]);
+        let description_compatibility = format!("{}{}{}", before, conditional, after);
+        let description_core = format!("{}{}", before, after);
+        match condition {
+            Some(Condition::CompatibilityOnly) => process_row(
+                spec,
+                condition,
+                [
+                    get_value,
+                    type_,
+                    get_cmnd,
+                    initial_value,
+                    &description_compatibility,
+                    section,
+                    attribute,
+                ],
+                entries,
+            ),
+            Some(Condition::CoreOnly) => process_row(
+                spec,
+                condition,
+                [
+                    get_value,
+                    type_,
+                    get_cmnd,
+                    initial_value,
+                    &description_core,
+                    section,
+                    attribute,
+                ],
+                entries,
+            ),
+            None => {
+                process_row(
+                    spec,
+                    Some(Condition::CompatibilityOnly),
+                    [
+                        get_value,
+                        type_,
+                        get_cmnd,
+                        initial_value,
+                        &description_compatibility,
+                        section,
+                        attribute,
+                    ],
+                    entries,
+                );
+                process_row(
+                    spec,
+                    Some(Condition::CoreOnly),
+                    [
+                        get_value,
+                        type_,
+                        get_cmnd,
+                        initial_value,
+                        &description_core,
+                        section,
+                        attribute,
+                    ],
+                    entries,
+                );
+            }
+        }
+        return;
+    }
 
     let get_value = unescape(get_value);
+
     // Some of these values are parameterised for compactness. We have to handle
     // this in one way or another, let's expand them for machine-friendliness.
+
+    // These expansions for RGBA PixelMap values are listed in the section for
+    // "The Imaging Subset" in a table labelled "PixelMap parameters".
+    const PIXEL_MAP_RGBA_MODES: &[&str] = &[
+        "PIXEL_MAP_I_TO_R",
+        "PIXEL_MAP_I_TO_G",
+        "PIXEL_MAP_I_TO_B",
+        "PIXEL_MAP_I_TO_A",
+        "PIXEL_MAP_R_TO_R",
+        "PIXEL_MAP_G_TO_G",
+        "PIXEL_MAP_B_TO_B",
+        "PIXEL_MAP_A_TO_A",
+    ];
+    const PIXEL_MAP_INDEX_MODES: &[&str] = &["PIXEL_MAP_I_TO_I", "PIXEL_MAP_S_TO_S"];
+
     // TEXTURE_1D, TEXTURE_2D, TEXTURE_3D, and related enums.
     if get_value.contains("$x$D") {
         let dimensions: &[&str] = if spec == "gl" {
@@ -86,6 +211,8 @@ fn process_row(
         };
         for dimension in dimensions {
             let get_value = get_value.replace("$x$", dimension);
+            // Remove vectorness
+            let type_ = divide(type_, dimensions.len());
             // Remove list of dimensions ("x is 1, 2, or 3.") from description,
             // then expand.
             let description = description
@@ -97,16 +224,173 @@ fn process_row(
                 condition,
                 [
                     &get_value,
-                    type_,
+                    &type_,
                     get_cmnd,
                     initial_value,
                     &description,
+                    section,
                     attribute,
                 ],
                 entries,
             );
         }
         return;
+    // These expansions for the BIAS values are listed in the section for
+    // "The Imaging Subset" in a table labelled "PixelTransfer parameters".
+    } else if get_value.contains("$x$_BIAS") {
+        for component in ["RED", "GREEN", "BLUE", "ALPHA"] {
+            let get_value = get_value.replace("$x$", component);
+            let description = description.replace("$x$", component);
+            process_row(
+                spec,
+                condition,
+                [
+                    &get_value,
+                    type_,
+                    get_cmnd,
+                    initial_value,
+                    &description,
+                    section,
+                    attribute,
+                ],
+                entries,
+            );
+        }
+        return;
+    } else if section == "\\ref{pix:xfer}" && get_value == "$x$" && get_cmnd.contains("GetPixelMap")
+    {
+        let modes = if description.contains("RGBA") {
+            PIXEL_MAP_RGBA_MODES
+        } else {
+            assert!(description.contains("Index"));
+            PIXEL_MAP_INDEX_MODES
+        };
+        for mode in modes {
+            let get_value = get_value.replace("$x$", mode);
+            // Remove vectorness
+            let type_ = divide(type_, modes.len());
+            // Remove plural and explanation of $x$.
+            let description = description.split_once("s; $x$ is").unwrap().0;
+            process_row(
+                spec,
+                condition,
+                [
+                    &get_value,
+                    &type_,
+                    get_cmnd,
+                    initial_value,
+                    description,
+                    section,
+                    attribute,
+                ],
+                entries,
+            );
+        }
+        return;
+    } else if section == "\\ref{pix:xfer}"
+        && get_value == "$x$_SIZE"
+        && get_cmnd.contains("GetIntegerv")
+    {
+        for mode in PIXEL_MAP_RGBA_MODES
+            .iter()
+            .chain(PIXEL_MAP_INDEX_MODES.iter())
+        {
+            let get_value = get_value.replace("$x$", mode);
+            let description = description.replace("$x$", mode);
+            process_row(
+                spec,
+                condition,
+                [
+                    &get_value,
+                    type_,
+                    get_cmnd,
+                    initial_value,
+                    &description,
+                    section,
+                    attribute,
+                ],
+                entries,
+            );
+        }
+        return;
+    // These expansions for Map1/Map2 values are listed in the "Evaluators"
+    // section table labelled "Values specified by the target to Map1".
+    } else if (get_value == "MAP1_$x$" || get_value == "MAP2_$x$") && get_cmnd == "\\glr{IsEnabled}"
+    {
+        let values = [
+            "VERTEX_3",
+            "VERTEX_4",
+            "INDEX",
+            "COLOR_4",
+            "NORMAL",
+            "TEXTURE_COORD_1",
+            "TEXTURE_COORD_2",
+            "TEXTURE_COORD_3",
+            "TEXTURE_COORD_4",
+        ];
+        for value in values {
+            let get_value = get_value.replace("$x$", value);
+            // Remove plural and explanation of $x$.
+            let description = description.split_once("s: $x$ is").unwrap().0;
+            // Remove vectorness.
+            let type_ = divide(type_, values.len());
+            process_row(
+                spec,
+                condition,
+                [
+                    &get_value,
+                    &type_,
+                    get_cmnd,
+                    initial_value,
+                    description,
+                    section,
+                    attribute,
+                ],
+                entries,
+            );
+        }
+        return;
+    } else if get_value.contains("$x$") {
+        // Some values conveniently list their expansions in their descriptions.
+        if let Some((description, expansions)) = description
+            .split_once("; $x$ is one of ")
+            .or_else(|| description.split_once(";\n$x$ is one of "))
+            .or_else(|| description.split_once(".    $x$ is one of "))
+            .or_else(|| description.split_once(". $x$ is one of "))
+            .or_else(|| description.split_once("; $x$ is "))
+            .or_else(|| description.split_once(" ($x$ is "))
+        {
+            if expansions.contains(',') {
+                let expansions = expansions.strip_suffix(')').unwrap_or(expansions);
+                let expansions: Vec<_> = expansions.split(',').collect();
+                for expansion in expansions.iter() {
+                    let expansion = expansion.trim();
+                    let expansion = expansion.strip_prefix("or ").unwrap_or(expansion);
+                    let expansion = expansion.strip_prefix("\\glc{").unwrap_or(expansion);
+                    let expansion = expansion.strip_suffix('}').unwrap_or(expansion);
+
+                    let get_value = get_value.replace("$x$", expansion);
+                    // Remove vectorness
+                    let type_ = divide(type_, expansions.len());
+                    let description = description.replace("$x$", expansion);
+                    process_row(
+                        spec,
+                        condition,
+                        [
+                            &get_value,
+                            &type_,
+                            get_cmnd,
+                            initial_value,
+                            &description,
+                            section,
+                            attribute,
+                        ],
+                        entries,
+                    );
+                }
+                return;
+            }
+        }
     }
 
     // In ES 1.1's spec, the whole type is implicitly inline math
@@ -130,15 +414,21 @@ fn process_row(
     let description = unescape(description);
     let attribute = attribute.to_string();
 
-    entries.push(Entry {
-        condition,
-        get_value,
-        type_,
-        get_cmnd,
-        initial_value,
-        description,
-        attribute,
-    });
+    // Note that the section is ignored because we don't have access to the
+    // LaTeX source of the full spec, so we can't resolve to a section number.
+
+    push_entry(
+        entries,
+        Entry {
+            condition,
+            get_value,
+            type_,
+            get_cmnd,
+            initial_value,
+            description,
+            attribute,
+        },
+    );
 }
 
 fn parse_spec(spec: &str) -> Vec<Entry> {
@@ -211,13 +501,14 @@ fn parse_spec(spec: &str) -> Vec<Entry> {
             text = new_text;
         }
 
-        // The section (cells[6]/cells[5]) is ignored because we don't have
-        // access to the LaTeX source of the full spec, so we can't resolve
-        // the ID to a section number
         let cells = if spec == "es11" {
-            [cells[4], cells[1], cells[3], cells[2], cells[5], cells[7]]
+            [
+                cells[4], cells[1], cells[3], cells[2], cells[5], cells[6], cells[7],
+            ]
         } else {
-            [cells[0], cells[1], cells[2], cells[3], cells[4], cells[6]]
+            [
+                cells[0], cells[1], cells[2], cells[3], cells[4], cells[5], cells[6],
+            ]
         };
 
         process_row(spec, condition, cells, &mut entries);
