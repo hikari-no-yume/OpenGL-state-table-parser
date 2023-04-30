@@ -42,6 +42,19 @@ enum Condition {
     ImagingSubset,
 }
 
+/// A state table
+#[derive(Debug)]
+struct Table {
+    /// This is a "string used to describe the table in the index"
+    title: String,
+    /// Extra text, usually footnotes, that follows `title`
+    caption: Option<String>,
+    /// An internal label within the LaTeX source
+    label: String,
+    /// The entries in (rows of) the state table
+    entries: Vec<Entry>,
+}
+
 /// An entry in one of the state tables, representing a state variable
 #[derive(Debug)]
 struct Entry {
@@ -526,7 +539,7 @@ fn process_row(
     );
 }
 
-fn parse_spec(spec: &str) -> Vec<Entry> {
+fn parse_spec(spec: &str) -> Vec<Table> {
     // Read text from file while removing comments
     let mut text = String::new();
     let file =
@@ -558,10 +571,11 @@ fn parse_spec(spec: &str) -> Vec<Entry> {
         }
     }
 
-    // Parse entries
-    let mut entries = Vec::new();
+    // Parse table headers and entries
+    let mut tables = Vec::new();
     let mut current_condition: Option<Condition> = None;
     let mut text: &str = &text;
+
     while let Some(offset) = text.find('\\') {
         text = &text[offset..];
 
@@ -577,6 +591,50 @@ fn parse_spec(spec: &str) -> Vec<Entry> {
         // Deprecated entry
         } else if text.starts_with("\\depentry") {
             Some(Condition::Compatibility)
+        // Probably the beginning of a table
+        } else if text.starts_with("\\begin") {
+            text = &text[text.find('{').unwrap()..];
+
+            let (kind, new_text) = read_cell(text);
+            text = new_text;
+
+            let field_count = if kind == "statetable" {
+                2
+            } else if kind == "statetableindex" {
+                3
+            } else {
+                continue;
+            };
+
+            text = text.strip_prefix("[\\dobar]").unwrap_or(text);
+
+            // "string used to describe the table in the index"
+            let (title, new_text) = read_cell(text);
+            text = new_text;
+
+            // extra text (usually footnotes)
+            let (title, caption) = if field_count == 3 {
+                let (caption, new_text) = read_cell(text);
+                text = new_text;
+                (title, Some(caption))
+            } else if let Some((title, caption)) = title.split_once('\n') {
+                (title, Some(caption))
+            } else {
+                (title, None)
+            };
+
+            // internal label used within the LaTeX source, let's use it as our
+            // own internal label
+            let (label, new_text) = read_cell(text);
+            text = new_text;
+
+            tables.push(Table {
+                title: title.to_string(),
+                caption: caption.map(|caption| caption.to_string()),
+                label: label.to_string(),
+                entries: Vec::new(),
+            });
+            continue;
         // Conditionals
         } else {
             if text.starts_with("\\ifnum\\specdep=1") {
@@ -613,13 +671,23 @@ fn parse_spec(spec: &str) -> Vec<Entry> {
             ]
         };
 
-        process_row(spec, condition, cells, &mut entries);
+        process_row(
+            spec,
+            condition,
+            cells,
+            &mut tables.last_mut().unwrap().entries,
+        );
     }
 
-    entries
+    tables
 }
 
-fn print_table(entries: &[Entry]) {
+fn print_table(table: &Table) {
+    println!("<h2 name=\"{}\">{}</h2>", table.label, table.title);
+    if let Some(ref caption) = table.caption {
+        println!("<p>{}</p>", caption);
+    }
+
     println!("<table>");
     println!("<thead>");
     println!("<th>Get value</th>");
@@ -630,7 +698,7 @@ fn print_table(entries: &[Entry]) {
     println!("<th>Attribute</th>");
     println!("</thead>");
     println!("<tbody>");
-    for entry in entries {
+    for entry in &table.entries {
         let color = entry.condition.map(|condition| match condition {
             Condition::Compatibility => "pink",
             Condition::Core => "lightgreen",
@@ -689,8 +757,10 @@ fn print_table(entries: &[Entry]) {
 
 fn main() {
     for spec in ["es11", "es", "gl"] {
-        let entries = parse_spec(spec);
-        println!("<h1><tt>{}</tt> state table entries</h1>", spec);
-        print_table(&entries);
+        let tables = parse_spec(spec);
+        println!("<h1><tt>{}</tt> state tables</h1>", spec);
+        for table in tables {
+            print_table(&table);
+        }
     }
 }
