@@ -50,6 +50,13 @@ struct Entry {
     condition: Option<Condition>,
     /// "Get value" (symbolic constant to pass to "Get command")
     get_value: String,
+    /// Alternative "Get value", if any. This is not necessarily a synonym, e.g.
+    /// `TRANSPOSE_` versions of matrices.
+    ///
+    /// These alternative values only seem to appear in the GL compatibility
+    /// profile, so you can ignore them for core profile OpenGL and both
+    /// versions of OpenGL ES. They're also mutually exclusive with `series`.
+    alt_get_value: Option<String>,
     /// If this is `Some(n)`, there is a series of at least `n` values, and the
     /// symbolic constant named by `get_value` is just the first of them.
     ///
@@ -415,25 +422,35 @@ fn process_row(
         type_.to_string()
     };
 
-    // Match series like GL_TEXTUREn, GL_CLIP_PLANEn etc.
-    let (get_value, series, type_) = if let Some(prefix) = get_value.strip_suffix("$i$") {
-        let first_get_value = format!("{}0", prefix);
-        // Extract minimum count from type
-        let (count, type_) = type_.split_once(" \\times ").unwrap();
-        let count = count.strip_prefix('$').unwrap();
-        // Handle annoying exception
-        let count = count
-            .strip_prefix('{')
-            .and_then(|count| count.strip_suffix('}'))
-            .unwrap_or(count);
-        // "*" means "at least"
-        let count = count.strip_suffix('*').unwrap();
-        // Ensure LaTeX inline math characters are balanced in type
-        let type_ = format!("${}", type_);
-        (first_get_value, Some(count.to_string()), type_)
-    } else {
-        (get_value, None, type_)
-    };
+    let (get_value, alt_get_value, series, type_) =
+        // Match series like GL_TEXTUREn, GL_CLIP_PLANEn etc.
+        if let Some(prefix) = get_value.strip_suffix("$i$") {
+            let first_get_value = format!("{}0", prefix);
+            // Extract minimum count from type
+            let (count, type_) = type_.split_once(" \\times ").unwrap();
+            let count = count.strip_prefix('$').unwrap();
+            // Handle annoying exception
+            let count = count
+                .strip_prefix('{')
+                .and_then(|count| count.strip_suffix('}'))
+                .unwrap_or(count);
+            // "*" means "at least"
+            let count = count.strip_suffix('*').unwrap();
+            // Ensure LaTeX inline math characters are balanced in type
+            let type_ = format!("${}", type_);
+            (first_get_value, None, Some(count.to_string()), type_)
+        // Match alternate name
+        } else if let Some((get_value, alt_get_value)) = get_value.split_once(" \\hbox{(") {
+            let alt_get_value = alt_get_value.strip_suffix(")}").unwrap();
+            (
+                get_value.to_string(),
+                Some(alt_get_value.to_string()),
+                None,
+                type_,
+            )
+        } else {
+            (get_value, None, None, type_)
+        };
 
     let get_cmnd = unescape(if spec == "es11" || get_cmnd == "--" || get_cmnd == "-" {
         get_cmnd
@@ -457,6 +474,7 @@ fn process_row(
         Entry {
             condition,
             get_value,
+            alt_get_value,
             series,
             type_,
             get_cmnd,
@@ -582,12 +600,19 @@ fn print_table(entries: &[Entry]) {
         } else {
             println!("<tr>");
         }
+        assert!(!(entry.series.is_some() && entry.alt_get_value.is_some()));
         if let Some(ref minimum) = entry.series {
             println!(
                 "<td>{} …<br>{} + (<i>n</i>-1)<br>where <i>n</i> ≥ {}</td>",
                 entry.get_value, entry.get_value, minimum,
             );
             println!("<td><i>n</i> × {}</td>", entry.type_);
+        } else if let Some(ref alt_get_value) = entry.alt_get_value {
+            println!(
+                "<td>{} <em>or</em><br> {}</td>",
+                entry.get_value, alt_get_value
+            );
+            println!("<td>{}</td>", entry.type_);
         } else {
             println!("<td>{}</td>", entry.get_value);
             println!("<td>{}</td>", entry.type_);
