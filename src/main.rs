@@ -31,12 +31,15 @@ fn read_cell(text: &str) -> (&str, &str) {
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 enum Condition {
-    /// This entry is only in the compatibility profile. It might have a
-    /// different definition in the core profile.
-    CoreOnly,
     /// This entry is only in the core profile. It might have a different
     /// definition in the compatibility profile.
-    CompatibilityOnly,
+    Core,
+    /// This entry is only in the compatibility profile. It might have a
+    /// different definition in the core profile.
+    Compatibility,
+    /// This entry is only in the Imaging Subset, which is only in the
+    /// compatibility profile.
+    ImagingSubset,
 }
 
 /// An entry in one of the state tables, representing a state variable
@@ -121,7 +124,7 @@ fn process_row(
         let description_compatibility = format!("{}{}{}", before, conditional, after);
         let description_core = format!("{}{}", before, after);
         match condition {
-            Some(Condition::CompatibilityOnly) => process_row(
+            Some(Condition::Compatibility) => process_row(
                 spec,
                 condition,
                 [
@@ -135,7 +138,7 @@ fn process_row(
                 ],
                 entries,
             ),
-            Some(Condition::CoreOnly) => process_row(
+            Some(Condition::Core) => process_row(
                 spec,
                 condition,
                 [
@@ -149,10 +152,11 @@ fn process_row(
                 ],
                 entries,
             ),
+            Some(Condition::ImagingSubset) => unimplemented!(),
             None => {
                 process_row(
                     spec,
-                    Some(Condition::CompatibilityOnly),
+                    Some(Condition::Compatibility),
                     [
                         get_value,
                         type_,
@@ -166,7 +170,7 @@ fn process_row(
                 );
                 process_row(
                     spec,
-                    Some(Condition::CoreOnly),
+                    Some(Condition::Core),
                     [
                         get_value,
                         type_,
@@ -235,9 +239,12 @@ fn process_row(
             );
         }
         return;
-    // These expansions for the BIAS values are listed in the section for
-    // "The Imaging Subset" in a table labelled "PixelTransfer parameters".
-    } else if get_value.contains("$x$_BIAS") {
+    // These expansions for the BIAS and SCALE values are listed in the section
+    // for "The Imaging Subset" in a table labelled "PixelTransfer parameters".
+    } else if section == "\\ref{pix:xfer}"
+        && (get_value.contains("$x$_BIAS") || get_value.contains("$x$_SCALE"))
+        && !description.contains(',')
+    {
         for component in ["RED", "GREEN", "BLUE", "ALPHA"] {
             let get_value = get_value.replace("$x$", component);
             let description = description.replace("$x$", component);
@@ -470,19 +477,26 @@ fn parse_spec(spec: &str) -> Vec<Entry> {
     while let Some(offset) = text.find('\\') {
         text = &text[offset..];
 
-        // Entries
-        let condition = if text.starts_with("\\doentry") {
+        // Normal entry or entry marking a change from a previous version
+        let condition = if text.starts_with("\\doentry")
+            || text.starts_with("\\cbentry")
+            || text.starts_with("\\ocbentry")
+        {
             current_condition
+        // Imaging subset (deprecated) entry
+        } else if text.starts_with("\\graydepentry") {
+            Some(Condition::ImagingSubset)
+        // Deprecated entry
         } else if text.starts_with("\\depentry") {
-            Some(Condition::CompatibilityOnly)
+            Some(Condition::Compatibility)
         // Conditionals
         } else {
             if text.starts_with("\\ifnum\\specdep=1") {
                 assert!(current_condition.is_none());
-                current_condition = Some(Condition::CompatibilityOnly);
+                current_condition = Some(Condition::Compatibility);
             } else if text.starts_with("\\else") {
-                assert!(current_condition == Some(Condition::CompatibilityOnly));
-                current_condition = Some(Condition::CoreOnly);
+                assert!(current_condition == Some(Condition::Compatibility));
+                current_condition = Some(Condition::Core);
             } else if text.starts_with("\\fi") {
                 assert!(current_condition.is_some());
                 current_condition = None;
@@ -530,8 +544,9 @@ fn print_table(entries: &[Entry]) {
     println!("<tbody>");
     for entry in entries {
         let color = entry.condition.map(|condition| match condition {
-            Condition::CompatibilityOnly => "pink",
-            Condition::CoreOnly => "lightgreen",
+            Condition::Compatibility => "pink",
+            Condition::Core => "lightgreen",
+            Condition::ImagingSubset => "silver",
         });
         if let Some(color) = color {
             println!("<tr style=\"background-color:{}\">", color);
