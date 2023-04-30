@@ -452,15 +452,26 @@ fn process_row(
             (get_value, None, None, type_)
         };
 
-    let get_cmnd = unescape(if spec == "es11" || get_cmnd == "--" || get_cmnd == "-" {
-        get_cmnd
-    } else {
-        get_cmnd
-            .strip_prefix("\\glr{")
-            .unwrap()
-            .strip_suffix('}')
-            .unwrap()
-    });
+    let get_cmnd = unescape(
+        if get_cmnd == "\\vbox{\\hbox{{\\bf GetIntegerv},}\\hbox{\\bf GetFloatv}}" {
+            // Weird outlier: CURRENT_COLOR has two commands listed in the
+            // OpenGL ES spec, unlike every other variable in these three specs.
+            // So far as I can tell there's no good reason for this, since even
+            // this old spec has a specific color type (C) and there doesn't seem to
+            // be any special handling for this variable. The OpenGL 4.6 spec says
+            // just GetFloatv, so let's normalise to that.
+            assert!(spec == "es11" && get_value == "CURRENT_COLOR");
+            "GetFloatv"
+        } else if spec == "es11" || get_cmnd == "--" || get_cmnd == "-" {
+            get_cmnd
+        } else {
+            get_cmnd
+                .strip_prefix("\\glr{")
+                .unwrap()
+                .strip_suffix('}')
+                .unwrap()
+        },
+    );
 
     let initial_value = unescape(initial_value);
     let description = unescape(description);
