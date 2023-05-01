@@ -7,6 +7,10 @@ fn read_cell(text: &str) -> (&str, &str) {
     let mut depth: u32 = 0;
     loop {
         offset += text[offset..].find(['{', '}']).unwrap();
+        if text[..offset].ends_with('\\') {
+            offset += 1;
+            continue;
+        }
         if text[offset..].starts_with('{') {
             offset += 1;
             depth += 1;
@@ -102,11 +106,36 @@ struct Entry {
 }
 
 fn unescape(cell: &str) -> String {
+    // Remove group around change marker
+    if let Some(offset) = cell.find("{\\ochange").or_else(|| cell.find("{\\change")) {
+        let (before, after) = cell.split_at(offset);
+        let (content, after) = read_cell(after);
+        return unescape(&format!("{}{}{}", before, content, after));
+    }
+    // Remove change marker with accompanying issue number annotation
+    if let Some(offset) = cell.find("\\change\\cbext{") {
+        let (before, after) = cell.split_at(offset);
+        let (_content, after) = read_cell(&after[after.find('{').unwrap()..]);
+        return unescape(&format!("{}{}", before, after));
+    }
     cell
+        // Collapse whitespace, HTML-style
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
         // Unescape underscores
         .replace("\\_", "_")
         // Remove line-wrap hyphenation
         .replace("\\-", "")
+        // LaTeX quotes to curly quotes
+        .replace("``", "“")
+        .replace("''", "”")
+        // Remove change markers (not a kind of escaping but annoying)
+        .replace("\\change ", "")
+        .replace("\\ochange ", "")
+        // Remove small-font markup (the spec isn't consistent about using this
+        // and it's not semantically useful)
+        .replace("\\small ", "")
 }
 
 /// Remove an expected multiplication in a type, i.e. turn
@@ -629,8 +658,8 @@ fn parse_spec(spec: &str) -> Vec<Table> {
             text = new_text;
 
             tables.push(Table {
-                title: title.to_string(),
-                caption: caption.map(|caption| caption.to_string()),
+                title: unescape(title),
+                caption: caption.map(unescape),
                 label: label.to_string(),
                 entries: Vec::new(),
             });
