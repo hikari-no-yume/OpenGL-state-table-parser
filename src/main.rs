@@ -51,10 +51,12 @@ enum Condition {
 struct Table {
     /// This is a "string used to describe the table in the index"
     title: String,
-    /// Extra text, usually footnotes, that follows `title`
+    /// Extra text that follows `title`
     caption: Option<String>,
     /// An internal label within the LaTeX source
     label: String,
+    /// Footnotes that are referenced by entries
+    footnotes: Vec<String>,
     /// The entries in (rows of) the state table
     entries: Vec<Entry>,
 }
@@ -88,14 +90,20 @@ struct Entry {
     ///
     /// There's only one case that doesn't have a type: `GetUniform`.
     type_: Option<String>,
+    /// Index of a table footnote (if any) referenced by the type
+    type_footnote: Option<usize>,
     /// "Get command" (function that can query this state variable)
     ///
     /// If this is [None], the variable is inaccessible.
     get_cmnd: Option<String>,
     /// "Initial value"
     initial_value: Option<String>,
+    /// Index of a table footnote (if any) referenced by the initial value
+    initial_value_footnote: Option<usize>,
     /// "Description"
     description: String,
+    /// Index of a table footnote (if any) referenced by the description
+    description_footnote: Option<usize>,
     /// "Attribute" (which attribute group to use with `PushAttrib`/`PopAttrib`
     /// or `PushClientAttrib`/`PopClientAttrib` as applicable)
     ///
@@ -119,6 +127,9 @@ fn unescape(cell: &str) -> String {
         return unescape(&format!("{}{}", before, after));
     }
     cell
+        // Remove change markers (not a kind of escaping but annoying)
+        .replace("\\change", "")
+        .replace("\\ochange", "")
         // Collapse whitespace, HTML-style
         .split_whitespace()
         .collect::<Vec<_>>()
@@ -130,9 +141,6 @@ fn unescape(cell: &str) -> String {
         // LaTeX quotes to curly quotes
         .replace("``", "“")
         .replace("''", "”")
-        // Remove change markers (not a kind of escaping but annoying)
-        .replace("\\change ", "")
-        .replace("\\ochange ", "")
         // Remove small-font markup (the spec isn't consistent about using this
         // and it's not semantically useful)
         .replace("\\small ", "")
@@ -173,12 +181,31 @@ fn push_entry(entries: &mut Vec<Entry>, new_entry: Entry) {
     entries.push(new_entry);
 }
 
-fn process_row(
-    spec: &str,
-    condition: Option<Condition>,
-    cells: [&str; 7],
-    entries: &mut Vec<Entry>,
-) {
+fn extract_footnote_ref(cell: String, table: &Table) -> (Option<String>, Option<usize>) {
+    // Reference to first footnote, either from table header or from the
+    // description
+    let (cell, footnote_ref) = if let Some(cell) = cell
+        .strip_suffix("\\fn1")
+        .or_else(|| cell.strip_suffix("\\footnotemark[1]"))
+    {
+        (cell, 0)
+    // Reference to second footnote in the table header
+    } else if let Some(cell) = cell.strip_suffix("\\fnb") {
+        (cell, 1)
+    } else {
+        return (Some(cell), None);
+    };
+
+    assert!(table.footnotes.get(footnote_ref).is_some());
+    let cell = cell.trim();
+    if cell.is_empty() {
+        (None, Some(footnote_ref))
+    } else {
+        (Some(cell.to_string()), Some(footnote_ref))
+    }
+}
+
+fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table: &mut Table) {
     let [get_value, type_, get_cmnd, initial_value, description, section, attribute] = cells;
 
     // The description might contain a deprecation conditional. Expand both
@@ -202,7 +229,7 @@ fn process_row(
                     section,
                     attribute,
                 ],
-                entries,
+                table,
             ),
             Some(Condition::Core) => process_row(
                 spec,
@@ -216,7 +243,7 @@ fn process_row(
                     section,
                     attribute,
                 ],
-                entries,
+                table,
             ),
             Some(Condition::ImagingSubset) => unimplemented!(),
             None => {
@@ -232,7 +259,7 @@ fn process_row(
                         section,
                         attribute,
                     ],
-                    entries,
+                    table,
                 );
                 process_row(
                     spec,
@@ -246,7 +273,7 @@ fn process_row(
                         section,
                         attribute,
                     ],
-                    entries,
+                    table,
                 );
             }
         }
@@ -301,7 +328,7 @@ fn process_row(
                     section,
                     attribute,
                 ],
-                entries,
+                table,
             );
         }
         return;
@@ -326,7 +353,7 @@ fn process_row(
                     section,
                     attribute,
                 ],
-                entries,
+                table,
             );
         }
         return;
@@ -356,7 +383,7 @@ fn process_row(
                     section,
                     attribute,
                 ],
-                entries,
+                table,
             );
         }
         return;
@@ -382,7 +409,7 @@ fn process_row(
                     section,
                     attribute,
                 ],
-                entries,
+                table,
             );
         }
         return;
@@ -419,7 +446,7 @@ fn process_row(
                     section,
                     attribute,
                 ],
-                entries,
+                table,
             );
         }
         return;
@@ -458,7 +485,7 @@ fn process_row(
                             section,
                             attribute,
                         ],
-                        entries,
+                        table,
                     );
                 }
                 return;
@@ -541,7 +568,35 @@ fn process_row(
         Some(unescape(initial_value))
     };
 
-    let description = unescape(description);
+    // Extract footnote reference for description first, to avoid confusing the
+    // code that extracts footnote definitions in the description.
+    let (description, description_footnote) = extract_footnote_ref(unescape(description), table);
+    let description = description.unwrap();
+
+    // Extract footnote definitions from the description. This should be done
+    // before extracting footnote references from the initial value or type,
+    // as otherwise they'll panic because they can't find the reference.
+    let description = if let Some((description, footnote)) = description
+        .split_once("\\fn1")
+        .or_else(|| description.split_once("\\footnotemark[1]"))
+    {
+        let description = description.trim();
+        let footnote = footnote.trim();
+        // Move this to the table header so we don't need two footnote systems.
+        // Only problem is this won't work if there's also table footnotes.
+        assert!(table.footnotes.is_empty());
+        table.footnotes.push(footnote.to_string());
+        description.to_string()
+    } else {
+        description
+    };
+
+    let (initial_value, initial_value_footnote) = initial_value
+        .map_or((None, None), |initial_value| {
+            extract_footnote_ref(initial_value, table)
+        });
+    let (type_, type_footnote) =
+        type_.map_or((None, None), |type_| extract_footnote_ref(type_, table));
 
     let attribute = if attribute == "--" || attribute == "-" {
         None
@@ -553,16 +608,19 @@ fn process_row(
     // LaTeX source of the full spec, so we can't resolve to a section number.
 
     push_entry(
-        entries,
+        &mut table.entries,
         Entry {
             condition,
             get_value,
             alt_get_value,
             series,
             type_,
+            type_footnote,
             get_cmnd,
             initial_value,
+            initial_value_footnote,
             description,
+            description_footnote,
             attribute,
         },
     );
@@ -679,10 +737,51 @@ fn parse_spec(spec: &str) -> Vec<Table> {
                 }
             };
 
+            // Extract footnotes from the caption
+            let mut footnotes = Vec::new();
+            let caption = if caption
+                .as_deref()
+                .map_or(false, |caption| caption.contains("\\fn"))
+            {
+                let mut remaining: &str = caption.as_deref().unwrap();
+                loop {
+                    remaining = remaining.trim_start();
+                    let (footnote, new_remaining) = if remaining.starts_with("{\\par") {
+                        read_cell(remaining)
+                    } else if remaining.starts_with("\\par") {
+                        let footnote_end = remaining[1..]
+                            .find("\\par")
+                            .map_or(remaining.len(), |i| i + 1);
+                        remaining.split_at(footnote_end)
+                    } else {
+                        assert!(remaining.is_empty());
+                        break;
+                    };
+                    remaining = new_remaining;
+
+                    let footnote = footnote
+                        .strip_prefix("\\par")
+                        .unwrap()
+                        .trim_start()
+                        .strip_prefix(match footnotes.len() {
+                            0 => "\\fn1",
+                            1 => "\\fnb",
+                            _ => unimplemented!(),
+                        })
+                        .unwrap()
+                        .trim_start();
+                    footnotes.push(footnote.to_string());
+                }
+                None
+            } else {
+                caption
+            };
+
             tables.push(Table {
                 title,
                 caption,
                 label: label.to_string(),
+                footnotes,
                 entries: Vec::new(),
             });
             continue;
@@ -722,21 +821,42 @@ fn parse_spec(spec: &str) -> Vec<Table> {
             ]
         };
 
-        process_row(
-            spec,
-            condition,
-            cells,
-            &mut tables.last_mut().unwrap().entries,
-        );
+        process_row(spec, condition, cells, tables.last_mut().unwrap());
     }
 
     tables
 }
 
 fn print_table(table: &Table) {
+    fn footnote_name(table: &Table, index: usize) -> String {
+        format!("{}-fn-{}", table.label, index)
+    }
+    fn footnote_symbol(index: usize) -> char {
+        ['†', '‡'][index]
+    }
+    fn reference_footnote(table: &Table, index: usize) {
+        print!(
+            "<sup><a href=\"#{}\">{}</a></sup>",
+            footnote_name(table, index),
+            footnote_symbol(index)
+        );
+    }
+
     println!("<h2 name=\"{}\">{}</h2>", table.label, table.title);
     if let Some(ref caption) = table.caption {
         println!("<p>{}</p>", caption);
+    }
+    if !table.footnotes.is_empty() {
+        println!("<ol>");
+        for (index, footnote) in table.footnotes.iter().enumerate() {
+            println!(
+                "<li id=\"{}\">{} {}</li>",
+                footnote_name(table, index),
+                footnote_symbol(index),
+                footnote
+            );
+        }
+        println!("</ol>");
     }
 
     println!("<table>");
@@ -760,46 +880,69 @@ fn print_table(table: &Table) {
         } else {
             println!("<tr>");
         }
-        assert!(!(entry.series.is_some() && entry.alt_get_value.is_some()));
+
+        print!("<td>");
+        if let Some(ref get_value) = entry.get_value {
+            print!("{}", get_value);
+        } else {
+            print!("—");
+        }
+        if let Some(ref alt_get_value) = entry.alt_get_value {
+            print!(" <em>or</em><br> {}", alt_get_value);
+        }
         if let Some(ref minimum) = entry.series {
             let first_value = entry.get_value.as_deref().unwrap();
-            println!(
-                "<td>{} …<br>{} + (<i>n</i>-1)<br>where <i>n</i> ≥ {}</td>",
-                first_value, first_value, minimum,
+            print!(
+                " …<br>{} + (<i>n</i>-1)<br>where <i>n</i> ≥ {}</td>",
+                first_value, minimum,
             );
-            println!("<td><i>n</i> × {}</td>", entry.type_.as_deref().unwrap());
-        } else {
-            if let Some(ref get_value) = entry.get_value {
-                if let Some(ref alt_get_value) = entry.alt_get_value {
-                    println!("<td>{} <em>or</em><br> {}</td>", get_value, alt_get_value);
-                } else {
-                    println!("<td>{}</td>", get_value);
-                }
-            } else {
-                println!("<td>—</td>");
-            }
-            if let Some(ref type_) = entry.type_ {
-                println!("<td>{}</td>", type_);
-            } else {
-                println!("<td>—</td>");
-            }
         }
+        println!("</td>");
+
+        print!("<td>");
+        if entry.series.is_some() {
+            print!("<i>n</i> × ");
+        }
+        if let Some(ref type_) = entry.type_ {
+            print!("{}", type_);
+        } else if entry.type_footnote.is_none() {
+            print!("—");
+        }
+        if let Some(footnote_index) = entry.type_footnote {
+            reference_footnote(table, footnote_index);
+        }
+        println!("</td>");
+
         if let Some(ref get_cmnd) = entry.get_cmnd {
             println!("<td>{}</td>", get_cmnd);
         } else {
             println!("<td>—</td>");
         }
+
+        print!("<td>");
         if let Some(ref initial_value) = entry.initial_value {
-            println!("<td>{}</td>", initial_value);
-        } else {
-            println!("<td>—</td>");
+            print!("{}", initial_value);
+        } else if entry.initial_value_footnote.is_none() {
+            print!("—");
         }
-        println!("<td>{}</td>", entry.description);
+        if let Some(footnote_index) = entry.initial_value_footnote {
+            reference_footnote(table, footnote_index);
+        }
+        println!("</td>");
+
+        print!("<td>");
+        print!("{}", entry.description);
+        if let Some(footnote_index) = entry.description_footnote {
+            reference_footnote(table, footnote_index);
+        }
+        println!("</td>");
+
         if let Some(ref attribute) = entry.attribute {
             println!("<td>{}</td>", attribute);
         } else {
             println!("<td>—</td>");
         }
+
         println!("</tr>");
     }
     println!("</tbody>");
