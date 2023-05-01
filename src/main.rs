@@ -944,6 +944,9 @@ fn print_table(table: &Table) {
 fn main() {
     for spec in ["es11", "es", "gl"] {
         let tables = parse_spec(spec);
+        println!("<!doctype html>");
+        println!("<meta charset=utf-8>");
+        println!("<title>OpenGL  state tables</title>");
         println!("<h1><tt>{}</tt> state tables</h1>", spec);
         println!("<table>");
         println!("<thead>");
