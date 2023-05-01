@@ -877,17 +877,17 @@ fn print_table(table: &Table) {
 
         print!("<td>");
         if let Some(ref get_value) = entry.get_value {
-            print!("{}", get_value);
+            print!("<code>{}</code>", get_value);
         } else {
             print!("—");
         }
         if let Some(ref alt_get_value) = entry.alt_get_value {
-            print!(" <em>or</em><br> {}", alt_get_value);
+            print!(" <em>or</em><br> <code>{}</code>", alt_get_value);
         }
         if let Some(ref minimum) = entry.series {
             let first_value = entry.get_value.as_deref().unwrap();
             print!(
-                " …<br>{} + (<i>n</i>-1)<br>where <i>n</i> ≥ {}</td>",
+                " …<br><code>{}</code> + (<var>n</var>-1)<br>where <var>n</var> ≥ {}</td>",
                 first_value, minimum,
             );
         }
@@ -895,7 +895,7 @@ fn print_table(table: &Table) {
 
         print!("<td>");
         if entry.series.is_some() {
-            print!("<i>n</i> × ");
+            print!("<var>n</var> × ");
         }
         if let Some(ref type_) = entry.type_ {
             print!("{}", type_);
@@ -908,7 +908,7 @@ fn print_table(table: &Table) {
         println!("</td>");
 
         if let Some(ref get_cmnd) = entry.get_cmnd {
-            println!("<td>{}</td>", get_cmnd);
+            println!("<td><code>{}</code></td>", get_cmnd);
         } else {
             println!("<td>—</td>");
         }
@@ -946,7 +946,7 @@ fn main() {
         let tables = parse_spec(spec);
         println!("<!doctype html>");
         println!("<meta charset=utf-8>");
-        println!("<title>OpenGL  state tables</title>");
+        println!("<title>OpenGL state tables</title>");
         println!("<h1><tt>{}</tt> state tables</h1>", spec);
         println!("<table>");
         println!("<thead>");
