@@ -627,39 +627,61 @@ fn parse_spec(spec: &str) -> Vec<Table> {
             let (kind, new_text) = read_cell(text);
             text = new_text;
 
-            let field_count = if kind == "statetable" {
-                2
-            } else if kind == "statetableindex" {
-                3
-            } else {
+            if ![
+                "statetable",
+                "statetableindex",
+                "statetabledifferentindexcaption",
+            ]
+            .contains(&kind)
+            {
                 continue;
             };
 
             text = text.strip_prefix("[\\dobar]").unwrap_or(text);
 
-            // "string used to describe the table in the index"
-            let (title, new_text) = read_cell(text);
-            text = new_text;
-
-            // extra text (usually footnotes)
-            let (title, caption) = if field_count == 3 {
+            // OpenGL-only macro
+            let (title, caption, label) = if kind == "statetableindex" {
+                let (title, new_text) = read_cell(text);
+                text = new_text;
                 let (caption, new_text) = read_cell(text);
                 text = new_text;
-                (title, Some(caption))
-            } else if let Some((title, caption)) = title.split_once('\n') {
-                (title, Some(caption))
+                let (label, new_text) = read_cell(text);
+                text = new_text;
+                (unescape(title), Some(unescape(caption)), label)
+            // OpenGL ES-only macro
+            } else if kind == "statetabledifferentindexcaption" {
+                // TODO: remove title from caption
+                let (caption, new_text) = read_cell(text);
+                text = new_text;
+                let (label, new_text) = read_cell(text);
+                text = new_text;
+                let (title, new_text) = read_cell(text);
+                text = new_text;
+                let title = unescape(title);
+                let caption = unescape(caption).strip_prefix(&title).unwrap().to_string();
+                (title, Some(caption), label)
+            // Common macro
             } else {
-                (title, None)
+                assert!(kind == "statetable");
+                let (title, new_text) = read_cell(text);
+                text = new_text;
+                let (label, new_text) = read_cell(text);
+                text = new_text;
+                if let Some((title, caption)) = title.split_once('\n') {
+                    (unescape(title), Some(unescape(caption)), label)
+                // Special hack for “Lighting (see also …)” in ES 1.1 spec to
+                // make it consistent with GL 4.6.
+                } else if title.contains(" (see also") {
+                    let (title, caption) = title.split_once(' ').unwrap();
+                    (unescape(title), Some(unescape(caption)), label)
+                } else {
+                    (unescape(title), None, label)
+                }
             };
 
-            // internal label used within the LaTeX source, let's use it as our
-            // own internal label
-            let (label, new_text) = read_cell(text);
-            text = new_text;
-
             tables.push(Table {
-                title: unescape(title),
-                caption: caption.map(unescape),
+                title,
+                caption,
                 label: label.to_string(),
                 entries: Vec::new(),
             });
