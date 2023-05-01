@@ -842,6 +842,8 @@ fn print_table(table: &Table) {
         );
     }
 
+    println!("<tr>");
+    println!("<td colspan=6>");
     println!("<h2 name=\"{}\">{}</h2>", table.label, table.title);
     if let Some(ref caption) = table.caption {
         println!("<p>{}</p>", caption);
@@ -858,17 +860,9 @@ fn print_table(table: &Table) {
         }
         println!("</ol>");
     }
+    println!("</td>");
+    println!("</tr>");
 
-    println!("<table>");
-    println!("<thead>");
-    println!("<th>Get value</th>");
-    println!("<th>Type</th>");
-    println!("<th>Get command</th>");
-    println!("<th>Initial value</th>");
-    println!("<th>Description</th>");
-    println!("<th>Attribute</th>");
-    println!("</thead>");
-    println!("<tbody>");
     for entry in &table.entries {
         let color = entry.condition.map(|condition| match condition {
             Condition::Compatibility => "pink",
@@ -945,16 +939,28 @@ fn print_table(table: &Table) {
 
         println!("</tr>");
     }
-    println!("</tbody>");
-    println!("</table>");
 }
 
 fn main() {
     for spec in ["es11", "es", "gl"] {
         let tables = parse_spec(spec);
         println!("<h1><tt>{}</tt> state tables</h1>", spec);
+        println!("<table>");
+        println!("<thead>");
+        println!("<tr>");
+        println!("<th>Get value</th>");
+        println!("<th>Type</th>");
+        println!("<th>Get command</th>");
+        println!("<th>Initial value</th>");
+        println!("<th>Description</th>");
+        println!("<th>Attribute</th>");
+        println!("</tr>");
+        println!("</thead>");
+        println!("<tbody>");
         for table in tables {
             print_table(&table);
         }
+        println!("</tbody>");
+        println!("</table>");
     }
 }
