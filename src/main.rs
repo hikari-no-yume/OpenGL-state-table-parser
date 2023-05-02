@@ -1,5 +1,8 @@
 #![allow(non_snake_case)] // let me capitalize the crate name, Rust!
 
+mod types;
+use types::{parse_type, print_type, Type};
+
 /// Match a set of curly braces potentially containing nested curly braces.
 /// Returns the content of the outermost set of braces, and the remaining text.
 fn read_cell(text: &str) -> (&str, &str) {
@@ -89,7 +92,7 @@ struct Entry {
     /// "Type"
     ///
     /// There's only one case that doesn't have a type: `GetUniform`.
-    type_: Option<String>,
+    type_: Option<MaybeParsed<Type>>,
     /// Index of a table footnote (if any) referenced by the type
     type_footnote: Option<usize>,
     /// "Get command" (function that can query this state variable)
@@ -111,6 +114,15 @@ struct Entry {
     /// compatibility profile. Not even OpenGL ES 1.1 has them, though the state
     /// tables nonetheless include attribute group information for some reason?
     attribute: Option<String>,
+}
+
+/// Some fields can be parsed into a structured form, but this won't always
+/// succeed. This enum is used in such cases: it either contains the parsed form
+/// (`T`) or an unparsed [String].
+#[derive(Debug, PartialEq, Eq)]
+enum MaybeParsed<T> {
+    Parsed(T),
+    Unparsed(String),
 }
 
 fn unescape(cell: &str) -> String {
@@ -604,6 +616,14 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
         Some(attribute.to_string())
     };
 
+    let type_ = type_.map(|type_| {
+        if let Some(parsed_type) = parse_type(&type_) {
+            MaybeParsed::Parsed(parsed_type)
+        } else {
+            MaybeParsed::Unparsed(type_)
+        }
+    });
+
     // Note that the section is ignored because we don't have access to the
     // LaTeX source of the full spec, so we can't resolve to a section number.
 
@@ -898,7 +918,10 @@ fn print_table(table: &Table) {
             print!("<var>n</var> × ");
         }
         if let Some(ref type_) = entry.type_ {
-            print!("{}", type_);
+            match type_ {
+                MaybeParsed::Parsed(t) => print_type(t),
+                MaybeParsed::Unparsed(s) => print!("{}", s),
+            }
         } else if entry.type_footnote.is_none() {
             print!("—");
         }
