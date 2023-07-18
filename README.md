@@ -7,7 +7,7 @@ It currently produces only an HTML output, but it has a clean separation between
 
 Things this does right now:
 
-* Produces nice clean semantic HTML, with rapid filtering options, hyperlinks for footnotes, and `<abbr>` tags to remind you what the type symbols mean.
+* Produces nice clean semantic HTML, with rapid filtering options, hyperlinks for footnotes, anchors for sections, and `<abbr>` tags to remind you what the type symbols mean.
 * Extracts clean “Get value”, “Get command” and “Attribute” fields.
 * Extracts footnotes from descriptions and table headers.
 * Parses almost all types.

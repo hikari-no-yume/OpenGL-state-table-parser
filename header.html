@@ -2,7 +2,7 @@
 <meta charset=utf-8>
 <title>OpenGL and OpenGL ES state tables</title>
 
-<h1 style="display: inline-block;">OpenGL and OpenGL ES state tables <sup><a href="https://github.com/hikari-no-yume/OpenGL-state-table-parser" style="font-size: small; font-weight: normal;">What's this?</a></sup></h1>
+<h1 style="display: inline-block;">OpenGL and OpenGL ES state tables <a href="https://github.com/hikari-no-yume/OpenGL-state-table-parser">What's this?</a></h1>
 <br>
 
 <style>
@@ -26,6 +26,17 @@
     background-color: pink;
     border-color: red;
 }
+h1 > a, h2 > a {
+    font-weight: normal;
+    vertical-align: super;
+}
+h1 > a {
+    font-size: 0.5em;
+}
+h2 > a {
+    font-size: smaller;
+    color: inherit;
+}
 summary > h2 {
     margin: 0;
     display: inline;
@@ -34,6 +45,9 @@ summary > h2 {
 }
 summary > h2:hover {
     cursor: pointer;
+}
+*:target {
+    background: lightyellow;
 }
 </style>
 
@@ -51,7 +65,20 @@ summary > h2:hover {
 (function () {
     'use strict';
 
+    window.onhashchange = function () {
+        // Expand the <details> if necessary.
+        let spec = window.location.hash.substr(1).split('-')[0];
+        if (spec) {
+            spec = document.getElementById(spec);
+        }
+        if (spec) {
+            spec.open = true;
+        }
+    };
+
     window.onload = function () {
+        window.onhashchange();
+
         let profiles = document.getElementById('profiles');
         let profileFilterStyle = document.createElement('style');
         document.body.appendChild(profileFilterStyle);

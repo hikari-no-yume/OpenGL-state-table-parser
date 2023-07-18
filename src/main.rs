@@ -924,17 +924,17 @@ fn class_for_condition(condition: &Option<Condition>) -> &str {
     }
 }
 
-fn print_table(table: &Table) {
-    fn footnote_name(table: &Table, index: usize) -> String {
-        format!("{}-fn-{}", table.label, index)
+fn print_table(table: &Table, spec_prefix: &str) {
+    fn footnote_name(label: &str, index: usize) -> String {
+        format!("{}-fn-{}", label, index)
     }
     fn footnote_symbol(index: usize) -> char {
         ['†', '‡'][index]
     }
-    fn reference_footnote(table: &Table, index: usize) {
+    fn reference_footnote(label: &str, index: usize) {
         print!(
             "<sup><a href=\"#{}\">{}</a></sup>",
-            footnote_name(table, index),
+            footnote_name(label, index),
             footnote_symbol(index)
         );
     }
@@ -951,9 +951,12 @@ fn print_table(table: &Table) {
         section_classes.push_str(class);
     }
 
-    println!("<tr class=\"{}\">", section_classes);
+    // avoid anchors clashing between specs
+    let label = format!("{}-{}", spec_prefix, table.label);
+
+    println!("<tr id=\"{}\" class=\"{}\">", label, section_classes);
     println!("<td colspan=6>");
-    println!("<h2 name=\"{}\">{}</h2>", table.label, table.title);
+    println!("<h2><a href=\"#{}\">§</a> {}</h2>", label, table.title);
     if let Some(ref caption) = table.caption {
         println!("<p>{}</p>", caption);
     }
@@ -962,7 +965,7 @@ fn print_table(table: &Table) {
         for (index, footnote) in table.footnotes.iter().enumerate() {
             println!(
                 "<li id=\"{}\">{} {}</li>",
-                footnote_name(table, index),
+                footnote_name(&label, index),
                 footnote_symbol(index),
                 footnote
             );
@@ -1007,7 +1010,7 @@ fn print_table(table: &Table) {
             print!("—");
         }
         if let Some(footnote_index) = entry.type_footnote {
-            reference_footnote(table, footnote_index);
+            reference_footnote(&label, footnote_index);
         }
         println!("</td>");
 
@@ -1024,14 +1027,14 @@ fn print_table(table: &Table) {
             print!("—");
         }
         if let Some(footnote_index) = entry.initial_value_footnote {
-            reference_footnote(table, footnote_index);
+            reference_footnote(&label, footnote_index);
         }
         println!("</td>");
 
         print!("<td>");
         print!("{}", entry.description);
         if let Some(footnote_index) = entry.description_footnote {
-            reference_footnote(table, footnote_index);
+            reference_footnote(&label, footnote_index);
         }
         println!("</td>");
 
@@ -1064,7 +1067,7 @@ fn main() {
             name, spec_copyright
         )
         .unwrap();
-        println!("<details>");
+        println!("<details id={}>", suffix);
         println!("<summary><h2>{} state tables</h2></summary>", name);
         println!("<table>");
         println!("<thead>");
@@ -1079,7 +1082,7 @@ fn main() {
         println!("</thead>");
         println!("<tbody>");
         for table in tables {
-            print_table(&table);
+            print_table(&table, suffix);
         }
         println!("</tbody>");
         println!("</table>");
