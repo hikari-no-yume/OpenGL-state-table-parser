@@ -1,7 +1,7 @@
 #![allow(non_snake_case)] // let me capitalize the crate name, Rust!
 
 mod types;
-use types::{parse_type, print_type, Type};
+use types::{parse_quantity, parse_type, print_quantity, print_type, MaybeParsed, Quantity, Type};
 
 /// Match a set of curly braces potentially containing nested curly braces.
 /// Returns the content of the outermost set of braces, and the remaining text.
@@ -88,7 +88,7 @@ struct Entry {
     /// be referred to in `description` as `$i$`.
     ///
     /// One example of such a series is `GL_TEXTURE0`.
-    series: Option<String>,
+    series: Option<Quantity>,
     /// "Type"
     ///
     /// There's only one case that doesn't have a type: `GetUniform`.
@@ -114,15 +114,6 @@ struct Entry {
     /// compatibility profile. Not even OpenGL ES 1.1 has them, though the state
     /// tables nonetheless include attribute group information for some reason?
     attribute: Option<String>,
-}
-
-/// Some fields can be parsed into a structured form, but this won't always
-/// succeed. This enum is used in such cases: it either contains the parsed form
-/// (`T`) or an unparsed [String].
-#[derive(Debug, PartialEq, Eq)]
-enum MaybeParsed<T> {
-    Parsed(T),
-    Unparsed(String),
 }
 
 fn unescape(cell: &str) -> String {
@@ -217,7 +208,13 @@ fn extract_footnote_ref(cell: String, table: &Table) -> (Option<String>, Option<
     }
 }
 
-fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table: &mut Table) {
+fn process_row(
+    spec: &str,
+    condition: Option<Condition>,
+    cells: [&str; 7],
+    constants: &[(String, String)],
+    table: &mut Table,
+) {
     let [get_value, type_, get_cmnd, initial_value, description, section, attribute] = cells;
 
     // The description might contain a deprecation conditional. Expand both
@@ -241,6 +238,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                     section,
                     attribute,
                 ],
+                constants,
                 table,
             ),
             Some(Condition::Core) => process_row(
@@ -255,6 +253,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                     section,
                     attribute,
                 ],
+                constants,
                 table,
             ),
             Some(Condition::ImagingSubset) => unimplemented!(),
@@ -271,6 +270,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                         section,
                         attribute,
                     ],
+                    constants,
                     table,
                 );
                 process_row(
@@ -285,6 +285,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                         section,
                         attribute,
                     ],
+                    constants,
                     table,
                 );
             }
@@ -340,6 +341,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                     section,
                     attribute,
                 ],
+                constants,
                 table,
             );
         }
@@ -365,6 +367,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                     section,
                     attribute,
                 ],
+                constants,
                 table,
             );
         }
@@ -395,6 +398,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                     section,
                     attribute,
                 ],
+                constants,
                 table,
             );
         }
@@ -421,6 +425,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                     section,
                     attribute,
                 ],
+                constants,
                 table,
             );
         }
@@ -458,6 +463,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                     section,
                     attribute,
                 ],
+                constants,
                 table,
             );
         }
@@ -483,7 +489,12 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
 
                     let get_value = get_value.replace("$x$", expansion);
                     // Remove vectorness
-                    let type_ = divide(type_, expansions.len());
+                    let type_ =
+                        if let Some(stripped) = type_.strip_prefix("$\\mtexbasefmt \\times ") {
+                            format!("${}", stripped)
+                        } else {
+                            divide(type_, expansions.len())
+                        };
                     let description = description.replace("$x$", expansion);
                     process_row(
                         spec,
@@ -497,6 +508,7 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                             section,
                             attribute,
                         ],
+                        constants,
                         table,
                     );
                 }
@@ -532,9 +544,10 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
                 .unwrap_or(count);
             // "*" means "at least"
             let count = count.strip_suffix('*').unwrap();
+            let count = parse_quantity(count).unwrap();
             // Ensure LaTeX inline math characters are balanced in type
             let type_ = Some(format!("${}", type_));
-            (Some(first_get_value), None, Some(count.to_string()), type_)
+            (Some(first_get_value), None, Some(count), type_)
         // Match alternate name
         } else if let Some((get_value, alt_get_value)) = get_value.split_once(" \\hbox{(") {
             let alt_get_value = alt_get_value.strip_suffix(")}").unwrap();
@@ -577,7 +590,18 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
     let initial_value = if initial_value == "--" || initial_value == "-" {
         None
     } else {
-        Some(unescape(initial_value))
+        let mut initial_value = unescape(initial_value);
+
+        // Replace constants. These are used for things like MAX_DRAW_BUFFERS
+        // so that types can be parameterised by them. The "initial value"
+        // in this case is the spec's minimum for that constant, and we don't
+        // want an unhelpful recursive definition; a different approach is taken
+        // in the types code.
+        for (name, value) in constants {
+            initial_value = initial_value.replace(name, value);
+        }
+
+        Some(initial_value)
     };
 
     // Extract footnote reference for description first, to avoid confusing the
@@ -648,20 +672,19 @@ fn process_row(spec: &str, condition: Option<Condition>, cells: [&str; 7], table
 
 fn parse_spec(spec: &str) -> Vec<Table> {
     // Read text from file while removing comments
-    let mut text = String::new();
+    let mut defs_text = String::new();
+    let mut body_text = String::new();
     let file =
         std::fs::File::open(format!("tables_src/gettables.{}.tex", spec)).expect("Can't open file");
     let mut hit_divider = false;
     for line in std::io::BufRead::lines(std::io::BufReader::new(file)) {
         let line = line.unwrap();
 
-        // Ignore lines before the divider that marks the start of the entries
-        // proper (rather than the macro definitions etc which aren't handled)
+        // Split the spec into macro definitions and entries sections using
+        // this divider
         if !hit_divider {
             if line == "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" {
                 hit_divider = true;
-            } else {
-                continue;
             }
         }
 
@@ -673,15 +696,45 @@ fn parse_spec(spec: &str) -> Vec<Table> {
         };
         let line = line.trim_end();
         if !line.is_empty() {
-            text.push_str(line);
-            text.push('\n');
+            if hit_divider {
+                body_text.push_str(line);
+                body_text.push('\n');
+            } else {
+                defs_text.push_str(line);
+                defs_text.push('\n');
+            }
+        }
+    }
+
+    // Parse definitions of some special constants
+    let mut constants = Vec::new();
+    let mut text: &str = &defs_text;
+
+    while let Some(offset) = text.find('\\') {
+        text = &text[offset..];
+
+        // Constant definition
+        if let Some(def_name) = text.strip_prefix("\\def\\m") {
+            let (def_name, new_text) = def_name.split_at(def_name.find('{').unwrap());
+            let (def_value, new_text) = read_cell(new_text);
+            text = new_text;
+
+            constants.push((format!("\\m{}", def_name), def_value.to_string()));
+        // ugly hack: the only conditional constant definition (\mtexbasefmt) is
+        // one we don't need the value of, so we can stop at this point. this
+        // also avoids any confusion with the conditionals inside the table
+        // entry macro definitions :)
+        } else if text.starts_with("\\if") {
+            break;
+        } else {
+            text = &text[1..];
         }
     }
 
     // Parse table headers and entries
     let mut tables = Vec::new();
     let mut current_condition: Option<Condition> = None;
-    let mut text: &str = &text;
+    let mut text: &str = &body_text;
 
     while let Some(offset) = text.find('\\') {
         text = &text[offset..];
@@ -841,7 +894,13 @@ fn parse_spec(spec: &str) -> Vec<Table> {
             ]
         };
 
-        process_row(spec, condition, cells, tables.last_mut().unwrap());
+        process_row(
+            spec,
+            condition,
+            cells,
+            &constants,
+            tables.last_mut().unwrap(),
+        );
     }
 
     tables
@@ -907,9 +966,10 @@ fn print_table(table: &Table) {
         if let Some(ref minimum) = entry.series {
             let first_value = entry.get_value.as_deref().unwrap();
             print!(
-                " …<br><code>{}</code> + (<var>n</var>-1)<br>where <var>n</var> ≥ {}</td>",
-                first_value, minimum,
+                " …<br><code>{}</code> + (<var>n</var>-1)<br>where <var>n</var> ≥ ",
+                first_value
             );
+            print_quantity(minimum);
         }
         println!("</td>");
 

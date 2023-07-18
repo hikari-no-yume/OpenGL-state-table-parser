@@ -1,12 +1,22 @@
+/// Some fields can be parsed into a structured form, but this won't always
+/// succeed. This enum is used in such cases: it either contains the parsed form
+/// (`T`) or an unparsed [String].
+#[derive(Debug, PartialEq, Eq)]
+pub enum MaybeParsed<T> {
+    Parsed(T),
+    Unparsed(String),
+}
+
 /// A parsed representation of a type.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Type {
     /// The basic type, which is usually but not always a scalar.
     basic_type: BasicType,
-    ///// How many copies of the basic type? If this is [None], there's just one.
-    ///// The OpenGL specs notate this with `n × type`.
-    //quantity: Option<MaybeParsed<TypeQuantity>>,
-    quantity: Option<String>,
+    /// How many copies of the basic type? If this is empty, there's just one.
+    /// The OpenGL specs notate this with "n × type". Each element in this array
+    /// is another multiplication (so `[a, b, c]` means "a × b × c × type").
+    /// The boolean indicates whether this is a minimum ("n* × type").
+    quantity: Vec<MaybeParsed<(Quantity, bool)>>,
 }
 
 /// A parsed representation of a type code. The descriptions here come from the
@@ -50,7 +60,7 @@ enum BasicType {
     /// _Z_ (with subscript constant _k_): _k_-valued integer, or
     /// _Z_ (with subscript constant _k_ followed by asterisk): the same but
     /// _k_ is a minimum.
-    KValuedInteger { k: u32, minimum: bool },
+    KValuedInteger { k: Quantity, minimum: bool },
     /// _R_: Floating-point number
     Float,
     /// _R_ (with superscript plus sign): Non-negative floating-point number
@@ -96,8 +106,45 @@ enum BasicType {
     Char,
 }
 
-fn parse_quantity(quantity: &str) -> Option<u32> {
-    quantity.parse::<u32>().ok()
+/// Parsed representation of a quantity.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Quantity {
+    /// Simple integer quantity.
+    Integer(u32),
+    /// A specification-defined constant that varies with the implementation,
+    /// e.g. `MAX_DRAW_BUFFERS`.
+    Constant(&'static str),
+}
+impl std::fmt::Display for Quantity {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Quantity::Integer(n) => write!(f, "{}", n),
+            Quantity::Constant(c) => write!(f, "{}", c),
+        }
+    }
+}
+
+pub fn parse_quantity(quantity: &str) -> Option<Quantity> {
+    quantity
+        .parse::<u32>()
+        .ok()
+        .map(Quantity::Integer)
+        .or(match quantity {
+            "\\mtexcoord" => Some(Quantity::Constant("MAX_TEXTURE_COORDS")),
+            "\\mtexnum" | "\\mtexunit" => Some(Quantity::Constant("MAX_TEXTURE_UNITS")),
+            "\\mteximage" => Some(Quantity::Constant("MAX_COMBINED_TEXTURE_IMAGE_UNITS")),
+            "\\mimageunit" => Some(Quantity::Constant("MAX_IMAGE_UNITS")),
+            "\\mvtxattr" => Some(Quantity::Constant("MAX_VERTEX_ATTRIBS")),
+            "\\mdrawbuf" => Some(Quantity::Constant("MAX_DRAW_BUFFERS")),
+            // this is actually "MAX_<stage>_UNIFORM_BLOCKS", but their definitions
+            // are identical?
+            "\\mblockstage" => Some(Quantity::Constant("MAX_VERTEX_UNIFORM_BLOCKS")),
+            "\\mblockcombined" => Some(Quantity::Constant("MAX_COMBINED_UNIFORM_BLOCKS")),
+            // this is the number of stages defined by OpenGL, which is 6 in GL 4.6
+            // and GL ES 3.2 and doesn't have a constant
+            "\\mprogstage" => Some(Quantity::Integer(6)),
+            _ => None,
+        })
 }
 
 fn parse_basic_type(basic_type: &str) -> Option<BasicType> {
@@ -136,12 +183,21 @@ fn parse_basic_type(basic_type: &str) -> Option<BasicType> {
                 } else {
                     (false, k)
                 };
-                parse_quantity(k).map(|k| BasicType::KValuedInteger { k, minimum })
+                parse_quantity(k).map(|k| {
+                    // ignore minimum suffix for constants, because in the spec
+                    // that's intended to express the minimum value of the constant,
+                    // not that the quantity here has the constant as a minimum
+                    let minimum = minimum && !matches!(k, Quantity::Constant(_));
+                    BasicType::KValuedInteger { k, minimum }
+                })
             })
             .or_else(|| {
-                basic_type
-                    .strip_prefix("R_")
-                    .and_then(|k| parse_quantity(k).map(|k| BasicType::KValuedFloat { k }))
+                basic_type.strip_prefix("R_").and_then(|k| {
+                    parse_quantity(k).map(|k| {
+                        let Quantity::Integer(k) = k else { panic!() };
+                        BasicType::KValuedFloat { k }
+                    })
+                })
             })
             .or_else(|| {
                 basic_type
@@ -151,8 +207,20 @@ fn parse_basic_type(basic_type: &str) -> Option<BasicType> {
                             .and_then(|k| k.strip_suffix('}'))
                             .unwrap_or(k)
                     })
-                    .and_then(|k| parse_quantity(k).map(|k| BasicType::FloatTuple { k }))
+                    .and_then(|k| {
+                        parse_quantity(k).map(|k| {
+                            let Quantity::Integer(k) = k else { panic!() };
+                            BasicType::FloatTuple { k }
+                        })
+                    })
             }),
+    }
+}
+
+pub fn print_quantity(quantity: &Quantity) {
+    match quantity {
+        Quantity::Integer(n) => print!("{}", n),
+        Quantity::Constant(c) => print!("<code>{}</code>", c),
     }
 }
 
@@ -170,14 +238,19 @@ fn print_basic_type(basic_type: &BasicType) {
         BasicType::NonNegativeInteger => {
             print!("<abbr title=\"Non-negative integer\">Z<sup>+</sup></abbr>")
         }
-        BasicType::KValuedInteger { k, minimum: false } => print!(
-            "<abbr title=\"{}-valued integer\">Z<sub>{}</sub></abbr>",
-            k, k
-        ),
-        BasicType::KValuedInteger { k, minimum: true } => print!(
-            "<abbr title=\"{}-valued integer ({} is a minimum)\">Z<sub>{}*</sub></abbr>",
-            k, k, k
-        ),
+        BasicType::KValuedInteger { k, minimum: false } => {
+            print!("<abbr title=\"{}-valued integer\">Z<sub>", k);
+            print_quantity(k);
+            print!("</sub></abbr>");
+        }
+        BasicType::KValuedInteger { k, minimum: true } => {
+            print!(
+                "<abbr title=\"{}-valued integer ({} is a minimum)\">Z<sub>",
+                k, k
+            );
+            print_quantity(k);
+            print!("*</sub></abbr>");
+        }
         BasicType::Float => print!("<abbr title=\"Floating-point number\">R</abbr>"),
         BasicType::NonNegativeFloat => {
             print!("<abbr title=\"Non-negative floating-point number\">R<sup>+</sup></abbr>")
@@ -209,12 +282,27 @@ fn print_basic_type(basic_type: &BasicType) {
 pub fn parse_type(type_: &str) -> Option<Type> {
     let type_ = type_.strip_prefix('$').unwrap().strip_suffix('$').unwrap();
 
-    let (quantity, basic_type) =
-        if let Some((quantity, basic_type)) = type_.rsplit_once(" \\times ") {
-            (Some(quantity), basic_type)
+    let mut quantity = Vec::new();
+    let mut basic_type = type_;
+    while let Some((term, rest)) = basic_type.split_once(" \\times ") {
+        basic_type = rest;
+
+        let (unsuffixed, minimum) = if let Some(u) = term.strip_suffix('*') {
+            (u, true)
         } else {
-            (None, type_)
+            (term, false)
         };
+        quantity.push(match parse_quantity(unsuffixed) {
+            Some(parsed) => {
+                // ignore minimum suffix for constants, because in the spec
+                // that's intended to express the minimum value of the constant,
+                // not that the quantity here has the constant as a minimum
+                let minimum = minimum && !matches!(parsed, Quantity::Constant(_));
+                MaybeParsed::Parsed((parsed, minimum))
+            }
+            None => MaybeParsed::Unparsed(term.to_string()),
+        });
+    }
 
     if parse_basic_type(basic_type).is_none() {
         eprintln!("Couldn't parse basic type: {:?}", basic_type);
@@ -222,7 +310,7 @@ pub fn parse_type(type_: &str) -> Option<Type> {
 
     Some(Type {
         basic_type: parse_basic_type(basic_type)?,
-        quantity: quantity.map(|q| q.to_string()),
+        quantity,
     })
 }
 
@@ -231,8 +319,17 @@ pub fn print_type(type_: &Type) {
         basic_type,
         quantity,
     } = type_;
-    if let Some(quantity) = quantity {
-        print!("<code>{}</code> × ", quantity);
+    for term in quantity {
+        match term {
+            MaybeParsed::Parsed((term, minimum)) => {
+                print_quantity(term);
+                if *minimum {
+                    print!("<abbr title=\"quantity is a minimum\">*</abbr>");
+                }
+            }
+            MaybeParsed::Unparsed(term) => print!("<code>{}</code>", term),
+        }
+        print!(" × ");
     }
     print_basic_type(basic_type);
 }
