@@ -906,6 +906,15 @@ fn parse_spec(spec: &str) -> Vec<Table> {
     tables
 }
 
+fn class_for_condition(condition: &Option<Condition>) -> &str {
+    match condition {
+        Some(Condition::Compatibility) => "compatibility-only",
+        Some(Condition::Core) => "core-only",
+        Some(Condition::ImagingSubset) => "imaging-subset",
+        None => "no-condition",
+    }
+}
+
 fn print_table(table: &Table) {
     fn footnote_name(table: &Table, index: usize) -> String {
         format!("{}-fn-{}", table.label, index)
@@ -921,7 +930,19 @@ fn print_table(table: &Table) {
         );
     }
 
-    println!("<tr>");
+    // special classes for filtering only
+    let mut section_classes = String::from("section-header ");
+    for entry in &table.entries {
+        let class = class_for_condition(&entry.condition);
+        if section_classes.contains(class) {
+            continue;
+        }
+        section_classes.push(' ');
+        section_classes.push_str("has-");
+        section_classes.push_str(class);
+    }
+
+    println!("<tr class=\"{}\">", section_classes);
     println!("<td colspan=6>");
     println!("<h2 name=\"{}\">{}</h2>", table.label, table.title);
     if let Some(ref caption) = table.caption {
@@ -943,16 +964,7 @@ fn print_table(table: &Table) {
     println!("</tr>");
 
     for entry in &table.entries {
-        let color = entry.condition.map(|condition| match condition {
-            Condition::Compatibility => "pink",
-            Condition::Core => "lightgreen",
-            Condition::ImagingSubset => "silver",
-        });
-        if let Some(color) = color {
-            println!("<tr style=\"background-color:{}\">", color);
-        } else {
-            println!("<tr>");
-        }
+        println!("<tr class={}>", class_for_condition(&entry.condition));
 
         print!("<td>");
         if let Some(ref get_value) = entry.get_value {
@@ -1025,12 +1037,19 @@ fn print_table(table: &Table) {
 }
 
 fn main() {
-    for spec in ["es11", "es", "gl"] {
-        let tables = parse_spec(spec);
-        println!("<!doctype html>");
-        println!("<meta charset=utf-8>");
-        println!("<title>OpenGL state tables</title>");
-        println!("<h1><tt>{}</tt> state tables</h1>", spec);
+    println!(
+        "{}",
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/header.html"))
+    );
+    for (suffix, name) in [
+        ("es11", "OpenGL ES 1.1"),
+        ("es", "OpenGL ES 3.2"),
+        ("gl", "OpenGL 4.6"),
+    ] {
+        let tables = parse_spec(suffix);
+        println!("<details>");
+        println!("<summary>{} state tables</summary>", name);
+        println!("<h2>{} state tables</h2>", name);
         println!("<table>");
         println!("<thead>");
         println!("<tr>");
@@ -1048,5 +1067,6 @@ fn main() {
         }
         println!("</tbody>");
         println!("</table>");
+        println!("</details>");
     }
 }

@@ -1,0 +1,113 @@
+<!doctype html>
+<meta charset=utf-8>
+<title>OpenGL and OpenGL ES state tables</title>
+
+<h1>OpenGL and OpenGL ES state tables</h1>
+
+<style>
+.no-condition {
+    background-color: white;
+}
+.compatibility-only {
+    background-color: pink;
+}
+.core-only {
+    background-color: lightgreen;
+}
+.imaging-subset {
+    background-color: silver;
+}
+#profiles {
+    list-style-type: none;
+    padding: 0;
+}
+.invalid-regex {
+    background-color: pink;
+    border-color: red;
+}
+</style>
+
+<fieldset style="display: inline-block;">
+<legend>Profile filters (OpenGL only)</legend>
+<ul id=profiles>
+    <li class=no-condition>Core and Compatibility
+    <li class=compatibility-only>Compatibility only
+    <li class=core-only>Core only
+    <li class=imaging-subset>Imaging Subset (compatibility only)
+</ul>
+</fieldset>
+
+<script>
+(function () {
+    'use strict';
+
+    window.onload = function () {
+        let profiles = document.getElementById('profiles');
+        let profileFilterStyle = document.createElement('style');
+        document.body.appendChild(profileFilterStyle);
+        let visible = {};
+        Array.prototype.forEach.call(profiles.children, function (profile) {
+            let checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = visible[profile.className] = true;
+            profile.insertBefore(checkbox, profile.childNodes[0]);
+
+            checkbox.onchange = function () {
+                visible[profile.className] = checkbox.checked;
+
+                let rowStyles = '';
+                let sectionStyles = '.section-header';
+                for (let className in visible) {
+                    if (!Object.prototype.hasOwnProperty.call(visible, className)) {
+                        continue;
+                    }
+                    if (visible[className]) {
+                        sectionStyles += ":not(.has-" + className + ")";
+                    } else {
+                        rowStyles += "tr." + className + " { display: none; } ";
+                    }
+                }
+                sectionStyles += " { display: none; }";
+                profileFilterStyle.innerHTML = rowStyles + sectionStyles;
+            };
+        });
+
+        let getValueBox = document.createElement('input');
+        getValueBox.type = 'text';
+        getValueBox.placeholder = '^TEXTURE.*2D';
+        getValueBox.title = 'Regular expression for filtering by “Get value”';
+        profiles.parentElement.parentElement.insertBefore(getValueBox, profiles.parentElement);
+        profiles.parentElement.parentElement.insertBefore(document.createElement('br'), profiles.parentElement);
+        getValueBox.onkeyup = getValueBox.onchange = function () {
+            let rows = document.getElementsByTagName('tr');
+            let regex;
+            try {
+                regex = new RegExp(getValueBox.value, "gi");
+                getValueBox.className = '';
+            } catch (e) {
+                regex = new RegExp("", "gi");
+                getValueBox.className = 'invalid-regex';
+            }
+            let currentSection = null;
+            let visibleRowsInCurrentSection = false;
+            Array.prototype.forEach.call(rows, function (row) {
+                if (row.className.startsWith('section-header')) {
+                    if (currentSection !== null) {
+                        currentSection.style.display = visibleRowsInCurrentSection ? '' : 'none';
+                    }
+                    currentSection = row;
+                    visibleRowsInCurrentSection = false;
+                    return;
+                }
+                let rowGetValue = row.children[0].textContent;
+                let visible = rowGetValue.match(regex) !== null;
+                row.style.display = visible ? '' : 'none';
+                visibleRowsInCurrentSection |= visible;
+            });
+            if (currentSection !== null) {
+                currentSection.style.display = visibleRowsInCurrentSection ? '' : 'none';
+            }
+        };
+    };
+}());
+</script>
