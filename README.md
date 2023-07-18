@@ -1,9 +1,9 @@
 OpenGL state table parser
 =========================
 
-This is an **unofficial** project with **no guarantee of accuracy** that attempts to parse the LaTeX markup for the OpenGL specifications' state table sections, which [the Khronos Group graciously released on my request](https://github.com/KhronosGroup/OpenGL-Registry/issues/571). It attempts to wrangle some kind of order from chaos and assign machine-readable meaning to most of the content, which is a lot harder than it sounds.
+This is an **unofficial** project with **no guarantee of accuracy** that attempts to parse the LaTeX markup for the OpenGL specifications' state table sections, which [the Khronos Group graciously released at my request](https://github.com/KhronosGroup/OpenGL-Registry/issues/571). It attempts to wrangle some kind of order from chaos and assign machine-readable meaning to most of the content, which is a lot harder than it sounds. The goal is to provide something that both humans and machines find easier to read than the official PDFs.
 
-It currently produces only an HTML output, but it has a clean separation between the parsing and the HTML generation, so it would be easy to add JSON output in future. The goal is to provide something that both humans and machines find easier to read than the official PDFs.
+🌐 Check out the HTML! <https://hikari.noyu.me/etc/gl-state-tables.html> 🌐
 
 Things this does right now:
 
@@ -19,6 +19,7 @@ Things this does not do yet:
 
 * Parse the LaTeX markup within footnotes or the “Initial value” and “Description” fields, except insofar as is needed for features mentioned above.
 * Correct for most typos in the specs. There are many and I haven't kept track of them :(
+* Produce JSON or something like it. It currently only produces HTML, but it has a clean separation between the parsing and the HTML generation, so it would be easy to add JSON output in future.
 
 Things this will probably never do:
 
