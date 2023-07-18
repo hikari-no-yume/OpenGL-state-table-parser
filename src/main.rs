@@ -956,7 +956,7 @@ fn print_table(table: &Table, spec_prefix: &str) {
 
     println!("<tr id=\"{}\" class=\"{}\">", label, section_classes);
     println!("<td colspan=6>");
-    println!("<h2><a href=\"#{}\">§</a> {}</h2>", label, table.title);
+    println!("<h3><a href=\"#{}\">§</a> {}</h3>", label, table.title);
     if let Some(ref caption) = table.caption {
         println!("<p>{}</p>", caption);
     }

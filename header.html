@@ -26,15 +26,14 @@
     background-color: pink;
     border-color: red;
 }
-h1 > a, h2 > a {
+h1 > a, h3 > a {
     font-weight: normal;
-    vertical-align: super;
 }
 h1 > a {
+    vertical-align: super;
     font-size: 0.5em;
 }
-h2 > a {
-    font-size: smaller;
+h3 > a {
     color: inherit;
 }
 summary > h2 {
@@ -45,6 +44,9 @@ summary > h2 {
 }
 summary > h2:hover {
     cursor: pointer;
+}
+summary {
+    margin: 1em 0;
 }
 *:target {
     background: lightyellow;
