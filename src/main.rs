@@ -670,15 +670,24 @@ fn process_row(
     );
 }
 
-fn parse_spec(spec: &str) -> Vec<Table> {
+fn parse_spec(spec: &str) -> (String, Vec<Table>) {
     // Read text from file while removing comments
+    let mut copyright_text = String::new();
     let mut defs_text = String::new();
     let mut body_text = String::new();
     let file =
         std::fs::File::open(format!("tables_src/gettables.{}.tex", spec)).expect("Can't open file");
     let mut hit_divider = false;
+    let mut line_number = 0u32;
     for line in std::io::BufRead::lines(std::io::BufReader::new(file)) {
         let line = line.unwrap();
+
+        if line_number < 3 {
+            copyright_text.push_str(line.strip_prefix("% ").unwrap());
+            copyright_text.push('\n');
+            line_number += 1;
+            continue;
+        }
 
         // Split the spec into macro definitions and entries sections using
         // this divider
@@ -903,7 +912,7 @@ fn parse_spec(spec: &str) -> Vec<Table> {
         );
     }
 
-    tables
+    (copyright_text, tables)
 }
 
 fn class_for_condition(condition: &Option<Condition>) -> &str {
@@ -1041,12 +1050,20 @@ fn main() {
         "{}",
         include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/header.html"))
     );
+    let mut copyrights = String::new();
     for (suffix, name) in [
         ("es11", "OpenGL ES 1.1"),
         ("es", "OpenGL ES 3.2"),
         ("gl", "OpenGL 4.6"),
     ] {
-        let tables = parse_spec(suffix);
+        let (spec_copyright, tables) = parse_spec(suffix);
+        use std::fmt::Write;
+        write!(
+            copyrights,
+            "{} specification acknowledgments:<br><pre>{}</pre>",
+            name, spec_copyright
+        )
+        .unwrap();
         println!("<details>");
         println!("<summary>{} state tables</summary>", name);
         println!("<h2>{} state tables</h2>", name);
@@ -1069,4 +1086,6 @@ fn main() {
         println!("</table>");
         println!("</details>");
     }
+    println!("<hr>");
+    println!("{}", copyrights);
 }
