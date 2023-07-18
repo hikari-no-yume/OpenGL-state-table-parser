@@ -3,7 +3,7 @@ OpenGL state table parser
 
 This is an **unofficial** project with **no guarantee of accuracy** that attempts to parse the LaTeX markup for the OpenGL specifications' state table sections, which [the Khronos Group graciously released on my request](https://github.com/KhronosGroup/OpenGL-Registry/issues/571). It attempts to wrangle some kind of order from chaos and assign machine-readable meaning to most of the content, which is a lot harder than it sounds.
 
-It currently produces only an HTML output, but it has a clean separation between the parsing and the HTML generation, so it would be easy to add JSON output in future.
+It currently produces only an HTML output, but it has a clean separation between the parsing and the HTML generation, so it would be easy to add JSON output in future. The goal is to provide something that both humans and machines find easier to read than the official PDFs.
 
 Things this does right now:
 
@@ -15,7 +15,7 @@ Things this does right now:
 * Normalises all rows' “Get values” so they are either part of a series (e.g. `GL_LIGHT0 … GL_LIGHT7`) or have exactly one associated constant (e.g. `GL_TEXTURE_BINDING_2D`).
 * Where something _can't_ be parsed, the original LaTeX is preserved.
 
-Things this does not do currently:
+Things this does not do yet:
 
 * Parse the LaTeX markup within footnotes or the “Initial value” and “Description” fields, except insofar as is needed for features mentioned above.
 * Correct for most typos in the specs. There are many and I haven't kept track of them :(
