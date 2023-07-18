@@ -1086,7 +1086,7 @@ fn main() {
         println!("</details>");
     }
     println!("<hr>");
-    println!("<strong>This page is not produced by the Khronos Group, and cannot substitute for the Khronos Group specifications.</strong> This page is an independently created composite and reinterpretation that may contain inaccuracies; you rely on it at your own risk. Always consult <a href=\"https://registry.khronos.org/OpenGL/\">the Khronos Group specifications</a>. OpenGL® and OpenGL ES™ are trademarks used under license by the Khronos Group.</strong><br>");
+    println!("<p><strong>This page is not produced by the Khronos Group, and cannot substitute for the Khronos Group specifications.</strong> This page is an independently created composite and reinterpretation that may contain inaccuracies; you rely on it at your own risk. Always consult <a href=\"https://registry.khronos.org/OpenGL/\">the Khronos Group specifications</a>. OpenGL® and OpenGL ES™ are trademarks used under license by the Khronos Group.</strong></p>");
     println!("{}", copyrights);
-    println!("<a href=\"https://github.com/hikari-no-yume/OpenGL-state-table-parser\">OpenGL-state-table-parser</a> © 2023 hikari_no_yume. The content of this page may be redistributed under <a href=\"https://spdx.org/licenses/CC-BY-4.0.html\">CC BY 4.0</a>.");
+    println!("<p><a href=\"https://github.com/hikari-no-yume/OpenGL-state-table-parser\">OpenGL-state-table-parser</a> © 2023 hikari_no_yume. The content of this page may be redistributed under <a href=\"https://spdx.org/licenses/CC-BY-4.0.html\">CC BY 4.0</a>.</p>");
 }
